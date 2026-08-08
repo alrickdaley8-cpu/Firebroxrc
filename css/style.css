@@ -139,6 +139,8 @@ main {
 }
 .hint-card p { margin: 8px 0; color: var(--txt); font-size: 14px; }
 .hint-card .dim { color: var(--dim); font-size: 12px; margin-top: 14px; }
+.hint-card .dismiss-tip { color: var(--dim); font-size: 11px; margin-top: 10px; opacity: 0.8; }
+#overlayHint { cursor: pointer; }
 
 kbd {
   background: #232c3e;

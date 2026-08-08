@@ -71,6 +71,7 @@ const app = {
   blipT: 0,
   eventShake: 0,
   flags: {},
+  hintDismissed: (() => { try { return localStorage.getItem('firebrox.hintSeen') === '1'; } catch (_) { return false; } })(),
   flash: { msg: '', until: 0 },
 
   setFlash(msg, ttl = 3.2) {
@@ -350,7 +351,13 @@ function loop(now) {
     st.status.className = 'pill ' + cls;
   }
   st.rebuild.hidden = !en.seized;
-  st.hint.style.display = (en.ignition || en.rpm > 10) ? 'none' : 'flex';
+  st.hint.style.display = (!app.hintDismissed && !en.ignition && !(en.rpm > 10)) ? 'flex' : 'none';
+
+  // first-ever ignition dismisses the instructions for good
+  if (!app.hintDismissed && (en.ignition || en.rpm > 10)) {
+    app.hintDismissed = true;
+    try { localStorage.setItem('firebrox.hintSeen', '1'); } catch (_) { /* private mode */ }
+  }
 
   // ---------- audio ----------
   if ((frames % 3) === 0) pushFireAngles();

@@ -157,6 +157,10 @@ export function initUI(app) {
         if ($('modShop').classList.contains('hidden')) openModShop();
         else $('modShop').classList.add('hidden');
         break;
+      case 'KeyH':
+        app.hintDismissed = !app.hintDismissed;
+        try { localStorage.setItem('firebrox.hintSeen', app.hintDismissed ? '1' : '0'); } catch (_) { /* private mode */ }
+        break;
       case 'KeyM': {
         const chk = $('chkSound'); chk.checked = !chk.checked;
         chk.dispatchEvent(new Event('change')); break;
@@ -232,4 +236,10 @@ export function initUI(app) {
     closeModShop();
   });
   modShop.addEventListener('click', e => { if (e.target === modShop) closeModShop(); });
+
+  // instructions card: tap anywhere on it to dismiss (H brings it back)
+  $('overlayHint').addEventListener('pointerdown', () => {
+    app.hintDismissed = true;
+    try { localStorage.setItem('firebrox.hintSeen', '1'); } catch (_) { /* private mode */ }
+  });
 }
