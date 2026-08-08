@@ -10,7 +10,7 @@
 <body>
   <header>
     <div class="logo">FIREBROX<span>·RC</span></div>
-    <div class="subtitle">4-Stroke Internal Combustion Engine Simulator</div>
+    <div class="subtitle">4-Stroke Engine Simulator</div>
     <div class="spacer"></div>
     <div id="presetBtns" class="preset-btns">
       <button data-preset="i3">I3 1.0T</button>
@@ -23,18 +23,48 @@
   <main>
     <section class="stage">
       <canvas id="cv"></canvas>
+      <div id="flashMsg"></div>
       <div id="overlayHint">
         <div class="hint-card">
           <h2 id="engineName">2.0L Inline-4</h2>
           <p><b>1.</b> Press <kbd>SPACE</kbd> or the IGNITION button</p>
-          <p><b>2.</b> Hold <kbd>ENTER</kbd> or the STARTER button to crank</p>
-          <p><b>3.</b> Rev with the throttle slider or <kbd>↑</kbd>/<kbd>↓</kbd></p>
-          <p class="dim">Turn sound on for full effect 🔊</p>
+          <p><b>2.</b> Hold <kbd>ENTER</kbd> or STARTER to crank the engine</p>
+          <p><b>3.</b> Rev with <kbd>↑</kbd>/<kbd>↓</kbd> or the throttle slider</p>
+          <p><b>4.</b> Press <kbd>D</kbd> for <b>DRIVE MODE</b> — launch it, shift with <kbd>E</kbd>/<kbd>Q</kbd>, beat the ¼ mile</p>
+          <p class="dim">Turbo model · real gearbox · heat &amp; fuel · nitrous — sound on for full effect 🔊</p>
         </div>
       </div>
     </section>
 
     <aside>
+      <div class="panel cluster">
+        <div class="cell gear-cell">
+          <label>GEAR</label>
+          <b id="stGear" class="big">N</b>
+          <div id="gearBox" class="gear-btns disabled">
+            <button id="gearUp" title="Shift up (E)">▲</button>
+            <button id="gearDown" title="Shift down (Q)">▼</button>
+          </div>
+        </div>
+        <div class="cell">
+          <label>SPEED</label>
+          <b class="big"><span id="stSpeed">0</span><small> km/h</small></b>
+          <div class="timers">
+            <span>0–100: <b id="stT0100">—</b></span>
+            <span>¼mi: <b id="stQuarter">—</b></span>
+            <span>dist: <b id="stDist">0.00 km</b></span>
+          </div>
+        </div>
+        <div class="cell bars">
+          <label>BOOST <b id="stBoost">N/A</b></label>
+          <div class="bar"><i id="boostBarFill" class="boost"></i></div>
+          <label>FUEL <b id="stFuelL">8.00 L</b></label>
+          <div class="bar"><i id="fuelBarFill" class="fuel" style="width:100%"></i></div>
+          <label>NITROUS</label>
+          <div class="bar"><i id="nosBarFill" class="nos" style="width:100%"></i></div>
+        </div>
+      </div>
+
       <div class="panel tach-panel">
         <canvas id="tachCv"></canvas>
       </div>
@@ -44,11 +74,15 @@
         <div class="stat"><label>TORQUE</label><b id="stTq">—</b></div>
         <div class="stat"><label>POWER</label><b id="stKw">—</b></div>
         <div class="stat"><label>FIRING</label><b id="stFires">—</b></div>
-        <div class="stat"><label>COOLANT</label><b id="stCoolant">20 °C</b></div>
+        <div class="stat"><label>COOLANT</label><b id="stCoolant">18 °C</b></div>
         <div class="stat"><label>RUN PEAK</label><b id="stPeak">—</b></div>
       </div>
 
       <div class="panel controls">
+        <div class="row seg">
+          <button id="modeDyno" class="active">🔧 DYNO</button>
+          <button id="modeDrive">🛣️ DRIVE</button>
+        </div>
         <div class="row btns">
           <button id="btnIgn" class="big-toggle">IGNITION OFF</button>
           <button id="btnStarter" class="starter">⚡ STARTER (HOLD)</button>
@@ -58,10 +92,14 @@
           <input id="rngThrottle" type="range" min="0" max="100" value="0" />
           <b id="valThrottle">0%</b>
         </div>
-        <div class="row">
+        <div class="row" id="rowLoad">
           <label>DYNO LOAD</label>
           <input id="rngLoad" type="range" min="0" max="100" value="12" />
           <b id="valLoad">12%</b>
+        </div>
+        <div class="row btns2">
+          <button id="btnNos" class="nos-btn">🚀 NOS (HOLD)</button>
+          <button id="btnRefuel" class="refuel-btn">⛽ REFUEL</button>
         </div>
         <div class="row checks">
           <label><input id="chkLimiter" type="checkbox" checked /> Rev limiter</label>
@@ -84,10 +122,14 @@
     <span><kbd>SPACE</kbd> ignition</span>
     <span><kbd>ENTER</kbd> hold = crank</span>
     <span><kbd>↑</kbd><kbd>↓</kbd> throttle</span>
+    <span><kbd>D</kbd> dyno/drive</span>
+    <span><kbd>E</kbd>/<kbd>Q</kbd> gears</span>
+    <span><kbd>N</kbd> nitrous</span>
+    <span><kbd>F</kbd> refuel</span>
     <span><kbd>L</kbd> limiter</span>
     <span><kbd>M</kbd> mute</span>
     <span><kbd>R</kbd> rebuild</span>
-    <span class="warn-note">⚠ no limiter + sustained over-rev = seized engine</span>
+    <span class="warn-note">⚠ abuse = heat · no fuel = stall · over-rev = seizure</span>
   </footer>
 
   <script type="module" src="js/main.js"></script>

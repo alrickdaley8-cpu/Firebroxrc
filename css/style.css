@@ -154,6 +154,95 @@ aside { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
   margin-bottom: 6px;
 }
 
+/* ---------- instrument cluster ---------- */
+.cluster {
+  display: grid;
+  grid-template-columns: 74px 1fr 118px;
+  gap: 12px;
+}
+.cluster .cell { min-width: 0; }
+.cluster label {
+  font-size: 9px; letter-spacing: 1.2px; color: var(--dim); display: block;
+}
+.cluster label b { color: var(--txt); font-size: 10px; float: right; letter-spacing: 0; }
+.cluster .big {
+  font-size: 30px; font-family: "Cascadia Code", Consolas, monospace;
+  line-height: 1.05; color: var(--txt); display: block; margin-top: 2px;
+}
+.cluster .big small { font-size: 11px; color: var(--dim); }
+.gear-cell { text-align: center; }
+.gear-cell label { text-align: left; }
+.gear-btns { display: flex; gap: 4px; margin-top: 5px; }
+.gear-btns button {
+  flex: 1; padding: 3px 0; border-radius: 6px;
+  border: 1px solid var(--line); background: var(--panel2);
+  color: var(--txt); font-size: 11px; cursor: pointer;
+}
+.gear-btns button:active { border-color: var(--acc); color: var(--acc); }
+.timers { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+.timers span { font-size: 10px; color: var(--dim); }
+.timers b { color: var(--acc); font-family: Consolas, monospace; font-size: 11px; }
+
+.bars { display: flex; flex-direction: column; gap: 3px; }
+.bar {
+  height: 7px; border-radius: 4px; background: #0c1018;
+  border: 1px solid var(--line); overflow: hidden; margin-bottom: 4px;
+}
+.bar i { display: block; height: 100%; width: 0%; transition: width 0.15s; }
+.bar i.boost { background: linear-gradient(90deg, #2e7dd6, #67d4ff); }
+.bar i.fuel { background: linear-gradient(90deg, #d6a02e, #ffd267); }
+.bar i.nos  { background: linear-gradient(90deg, #7a3ee6, #c09aff); }
+
+/* ---------- mode segmented control ---------- */
+.seg { gap: 0 !important; }
+.seg button {
+  flex: 1; padding: 9px; font-weight: 800; letter-spacing: 1px; font-size: 11px;
+  background: var(--panel2); color: var(--dim);
+  border: 1px solid var(--line); cursor: pointer;
+}
+.seg button:first-child { border-radius: 10px 0 0 10px; }
+.seg button:last-child { border-radius: 0 10px 10px 0; border-left: none; }
+.seg button.active {
+  color: #fff; background: linear-gradient(180deg, #3a2413, #241608);
+  border-color: var(--acc); box-shadow: inset 0 0 14px rgba(255,123,36,0.25);
+}
+
+.controls .row.disabled { opacity: 0.35; pointer-events: none; }
+.gear-btns.disabled { opacity: 0.35; pointer-events: none; }
+
+/* ---------- nitrous / refuel buttons ---------- */
+.btns2 { gap: 8px; }
+.nos-btn {
+  flex: 1.4; padding: 11px; font-weight: 800; font-size: 12px; letter-spacing: 0.5px;
+  border-radius: 10px; border: 1px solid #4a2d8a;
+  background: linear-gradient(180deg, #4530a0, #2c1d66); color: #ded2ff;
+  cursor: pointer; user-select: none; transition: filter 0.1s;
+}
+.nos-btn.on, .nos-btn:active {
+  filter: brightness(1.6);
+  box-shadow: 0 0 18px rgba(140, 90, 255, 0.6);
+}
+.refuel-btn {
+  flex: 1; padding: 11px; font-weight: 800; font-size: 12px;
+  border-radius: 10px; border: 1px solid #7a5d24;
+  background: linear-gradient(180deg, #8a652a, #5d431a); color: #ffe8bb;
+  cursor: pointer;
+}
+.refuel-btn:hover { filter: brightness(1.25); }
+
+/* ---------- flash toast ---------- */
+#flashMsg {
+  position: absolute; left: 50%; bottom: 46px; transform: translateX(-50%) translateY(14px);
+  background: rgba(15, 19, 30, 0.94); border: 1px solid var(--acc);
+  color: #ffd9b0; padding: 10px 22px; border-radius: 12px;
+  font-weight: 700; font-size: 15px; letter-spacing: 0.5px;
+  opacity: 0; pointer-events: none; white-space: nowrap;
+  transition: opacity 0.25s, transform 0.25s;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.6), 0 0 24px rgba(255,123,36,0.25);
+  z-index: 5;
+}
+#flashMsg.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
 .tach-panel { padding: 6px; }
 #tachCv { width: 100%; height: 205px; display: block; }
 

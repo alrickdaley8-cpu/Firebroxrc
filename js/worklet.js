@@ -1,8 +1,8 @@
 // ============================================================
 // worklet.js — AudioWorkletProcessor: synthesizes engine audio
 // Pulse-train of combustion events -> filtered noise + sub rumble
-// + starter whine + overrun crackle. Driven by k-rate params
-// updated each animation frame from the physics engine.
+// + starter whine + overrun crackle + turbo whistle + intake
+// whoosh + BOV pssh + shift clunk + nitrous hiss + cold lope.
 // ============================================================
 
 class ICEAudioProcessor extends AudioWorkletProcessor {
@@ -17,6 +17,9 @@ class ICEAudioProcessor extends AudioWorkletProcessor {
       { name: 'cyls',       defaultValue: 4,     minValue: 1,    maxValue: 12 },
       { name: 'throaty',    defaultValue: 0.5,   minValue: 0,    maxValue: 1 },
       { name: 'master',     defaultValue: 1,     minValue: 0,    maxValue: 1 },
+      { name: 'boost',      defaultValue: 0,     minValue: 0,    maxValue: 2 },
+      { name: 'nos',        defaultValue: 0,     minValue: 0,    maxValue: 1 },
+      { name: 'cold',       defaultValue: 0,     minValue: 0,    maxValue: 1 },
     ];
   }
 
@@ -25,13 +28,21 @@ class ICEAudioProcessor extends AudioWorkletProcessor {
     this.phase = 0;          // 0..720 four-stroke cycle degrees
     this.env = 0;            // combustion pulse envelope
     this.lp1 = 0; this.lp2 = 0;   // one-pole lowpass states
-    this.subPh = 0;          // sub oscillator phase
-    this.shufPh = 0;         // intake shuffle oscillator phase
-    this.crankPh = 0;        // starter whine phase
-    this.t = 0;              // running time seconds
-    this.fireAngles = [0, 180, 360, 540]; // updated from main thread
+    this.intLp = 0;          // intake whoosh lowpass state
+    this.subPh = 0;
+    this.shufPh = 0;
+    this.crankPh = 0;
+    this.whisPh = 0;         // turbo whistle phase
+    this.bovEnv = 0;         // blow-off valve envelope
+    this.clunkEnv = 0;       // gear shift thud envelope
+    this.clunkPh = 0;
+    this.t = 0;
+    this.fireAngles = [0, 180, 360, 540];
     this.port.onmessage = (e) => {
-      if (e.data && e.data.fireAngles) this.fireAngles = e.data.fireAngles;
+      if (!e.data) return;
+      if (e.data.fireAngles) this.fireAngles = e.data.fireAngles;
+      if (e.data.bov) this.bovEnv = 1;
+      if (e.data.shift) { this.clunkEnv = 0.9; this.clunkPh = 0; }
     };
   }
 
@@ -43,18 +54,14 @@ class ICEAudioProcessor extends AudioWorkletProcessor {
 
     const rpmP = params.rpm, loadP = params.load, combP = params.combustion,
       crankP = params.cranking, cutP = params.cut, overP = params.overrun,
-      cylP = params.cyls, thrP = params.throaty, mastP = params.master;
+      cylP = params.cyls, thrP = params.throaty, mastP = params.master,
+      boostP = params.boost, nosP = params.nos, coldP = params.cold;
 
     for (let i = 0; i < n; i++) {
-      const rpm = rpmP.length > 1 ? rpmP[i] : rpmP[0];
-      const load = loadP.length > 1 ? loadP[i] : loadP[0];
-      const comb = combP.length > 1 ? combP[i] : combP[0];
-      const crank = crankP.length > 1 ? crankP[i] : crankP[0];
-      const cut = cutP.length > 1 ? cutP[i] : cutP[0];
-      const over = overP.length > 1 ? overP[i] : overP[0];
-      const cyls = cylP.length > 1 ? cylP[i] : cylP[0];
-      const thr = thrP.length > 1 ? thrP[i] : thrP[0];
-      const mast = mastP.length > 1 ? mastP[i] : mastP[0];
+      const g = (p, dflt) => (p.length > 1 ? p[i] : p[0]);
+      const rpm = g(rpmP), load = g(loadP), comb = g(combP), crank = g(crankP),
+        cut = g(cutP), over = g(overP), cyls = g(cylP), thr = g(thrP),
+        mast = g(mastP), boost = g(boostP), nos = g(nosP), cold = g(coldP);
 
       this.t += 1 / sr;
 
@@ -68,22 +75,22 @@ class ICEAudioProcessor extends AudioWorkletProcessor {
             ? (prev < a && this.phase >= a)
             : (prev < a || this.phase >= a);
           if (crossed) {
-            const jitter = 0.82 + Math.random() * 0.18;
-            const depth = (0.30 + 0.70 * load) * jitter;
+            const jSpan = cold > 0.5 ? 0.42 : 0.24;      // cold = rougher
+            const jitter = (1 - jSpan / 2) + Math.random() * jSpan;
+            const depth = (0.30 + 0.70 * load) * jitter * (1 + 0.35 * nos);
             if (Math.random() >= cut) {
-              this.env = Math.min(1.2, this.env + depth);
+              this.env = Math.min(1.3, this.env + depth);
             } else {
-              this.env = Math.min(1.2, this.env + depth * 0.10); // cut = weak pop
+              this.env = Math.min(1.3, this.env + depth * 0.10);
             }
           }
         }
       }
-      // overrun exhaust crackle (throttle snapped shut at rpm)
+      // overrun exhaust crackle
       if (over > 0.5 && Math.random() < (rpm / 4000) * 0.00028) {
-        this.env = Math.min(1.2, this.env + 0.25 + Math.random() * 0.4);
+        this.env = Math.min(1.3, this.env + 0.25 + Math.random() * 0.4);
       }
 
-      // envelope decay: short pops at low rpm, blending at high rpm
       const decay = 150 + rpm * 0.06;
       this.env *= Math.exp(-decay / sr);
 
@@ -94,7 +101,7 @@ class ICEAudioProcessor extends AudioWorkletProcessor {
       const a2 = 1 - Math.exp(-2 * Math.PI * (cutoff * 0.55) / sr);
       this.lp1 += a1 * (noise * this.env - this.lp1);
       this.lp2 += a2 * (this.lp1 - this.lp2);
-      let sig = this.lp2 * 2.4;
+      let sig = this.lp2 * (2.4 + 0.8 * nos);
 
       // --- sub rumble at half firing frequency ---
       const fireHz = (rpm / 60) * cyls / 2;
@@ -102,9 +109,39 @@ class ICEAudioProcessor extends AudioWorkletProcessor {
       if (comb > 0.5) {
         const subGain = 0.22 * Math.min(1, rpm / 900) * (0.35 + 0.65 * load) * (0.4 + 0.6 * thr);
         sig += Math.sin(this.subPh) * subGain;
-        // intake/turbo shuffle at 1.5x crank frequency
         this.shufPh += 2 * Math.PI * (rpm / 60) * 1.5 / sr;
         sig += Math.sin(this.shufPh) * 0.05 * load;
+      }
+
+      // --- intake whoosh (throttle-open broadband) ---
+      const intA = 1 - Math.exp(-2 * Math.PI * (1400 + 1600 * load) / sr);
+      this.intLp += intA * (noise - this.intLp);
+      sig += (noise - this.intLp) * 0.10 * load * (comb > 0.5 ? 1 : 0);
+
+      // --- turbo whistle ---
+      if (boost > 0.02) {
+        this.whisPh += 2 * Math.PI * (1000 + boost * 3200 + rpm * 0.06) / sr;
+        sig += Math.sin(this.whisPh) * 0.030 * boost * (0.4 + 0.6 * load);
+        sig += Math.sin(this.whisPh * 0.5) * 0.012 * boost;
+      }
+
+      // --- BOV pssh ---
+      if (this.bovEnv > 0.004) {
+        sig += noise * this.bovEnv * 0.20;
+        this.bovEnv *= Math.exp(-14 / sr);
+      }
+
+      // --- shift clunk ---
+      if (this.clunkEnv > 0.004) {
+        this.clunkPh += 2 * Math.PI * 85 / sr;
+        sig += Math.sin(this.clunkPh) * this.clunkEnv * 0.5;
+        this.clunkEnv *= Math.exp(-30 / sr);
+      }
+
+      // --- nitrous hiss ---
+      if (nos > 0.5) {
+        sig += noise * 0.045;
+        sig += Math.sin(this.subPh * 3) * 0.05;
       }
 
       // --- starter motor whine ---
@@ -115,7 +152,6 @@ class ICEAudioProcessor extends AudioWorkletProcessor {
         sig += saw * 0.075 * trem;
       }
 
-      // soft clip + master
       sig = Math.tanh(sig * (1.0 + 1.6 * load)) * 0.62 * mast;
 
       L[i] = sig;

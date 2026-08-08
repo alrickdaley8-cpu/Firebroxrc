@@ -59,19 +59,19 @@ function liftProfile(tc, startDeg, durDeg, mx) {
 
 // ---------- state for particles & flashes ----------
 export function makeCutawayState() {
-  return { particles: [], flashes: [], smokes: [], lastT: 0 };
+  return { particles: [], flashes: [], smokes: [], lastT: 0, turboAngle: 0 };
 }
 
 const MAXP = 160;
 
 // ============================================================
 // MAIN CUTAWAY RENDER
+// view: { throttle, load, showLabels, mode, gear, speedKmh, shiftPing, eventShake }
 // ============================================================
-export function renderCutaway(c, lay, eng, st, controls, now, dt) {
+export function renderCutaway(c, lay, eng, st, view, now, dt) {
   const cfg = eng.cfg;
   const n = lay.nCyl;
   const th = eng.theta;
-  const adv = eng.sparkAdvanceRad ? eng.sparkAdvanceRad() : 0.3;
 
   c.clearRect(0, 0, CW, CH);
 
@@ -84,9 +84,10 @@ export function renderCutaway(c, lay, eng, st, controls, now, dt) {
   for (let gx = 0; gx < CW; gx += 49) { c.beginPath(); c.moveTo(gx, 0); c.lineTo(gx, CH); c.stroke(); }
   for (let gy = 0; gy < CH; gy += 49) { c.beginPath(); c.moveTo(0, gy); c.lineTo(CW, gy); c.stroke(); }
 
-  // ---- engine shake (torque reaction at low rpm / cranking) ----
+  // ---- engine shake (torque reaction at low rpm / cranking / events) ----
   const shakeAmp = clamp(2.2 - eng.rpm / 1400, 0, 1) * clamp(eng.shake * 0.004, 0, 2.2)
-    + (eng.cranking ? 0.7 : 0) + (eng.limitCut > 0.5 ? 0.6 : 0);
+    + (eng.cranking ? 0.7 : 0) + (eng.limitCut > 0.5 ? 0.6 : 0)
+    + (view.eventShake || 0) + (eng.nosActive ? 0.5 : 0);
   const shX = (Math.random() - 0.5) * shakeAmp;
   const shY = (Math.random() - 0.5) * shakeAmp;
 
@@ -131,7 +132,7 @@ export function renderCutaway(c, lay, eng, st, controls, now, dt) {
   rr(c, tbX, plY - 14, 46, 28, 8); c.fillStyle = '#2c3850'; c.fill(); c.strokeStyle = '#10141f'; c.stroke();
   c.beginPath(); c.arc(tbX + 23, plY, 11, 0, TWO_PI); c.fillStyle = '#0d1220'; c.fill();
   // butterfly plate
-  const bAng = (12 + 74 * controls.throttle) * Math.PI / 180;
+  const bAng = (12 + 74 * view.throttle) * Math.PI / 180;
   c.save(); c.translate(tbX + 23, plY); c.rotate(bAng);
   c.fillStyle = '#c9d6f2'; c.fillRect(-10, -1.8, 20, 3.6); c.restore();
   bolt(c, tbX + 23, plY, 3, '#5a6b8f');
@@ -337,7 +338,8 @@ export function renderCutaway(c, lay, eng, st, controls, now, dt) {
   bolt(c, fwX - 1, cyC, 9, '#8b96a8');
   // dyno absorber drum
   const dynX = fwX - 98;
-  const dynHeat = clamp(controls.load * eng.rpm / cfg.redline * 1.6, 0, 1);
+  const dynLoad = view.mode === 'drive' ? eng.loadFactor * 0.7 : view.load;
+  const dynHeat = clamp(dynLoad * eng.rpm / cfg.redline * 1.6, 0, 1);
   rr(c, dynX, cyC - 76, 62, 152, 12);
   c.fillStyle = '#26303f'; c.fill(); c.strokeStyle = '#12161e'; c.lineWidth = 2; c.stroke();
   const dg = c.createRadialGradient(dynX + 31, cyC, 4, dynX + 31, cyC, 44);
@@ -357,10 +359,18 @@ export function renderCutaway(c, lay, eng, st, controls, now, dt) {
   for (let y = -28; y <= 28; y += 8) c.fillRect(lay.X1 + 16, cyC + y, 4, 4);
 
   // =================================================
-  // EXHAUST HEADERS + particles
+  // EXHAUST HEADERS + heat glow + flames
   // =================================================
   const colX = lay.X1 + 34;
-  c.strokeStyle = '#6e5b4a'; c.lineWidth = 12; c.lineCap = 'round';
+  const egt = eng.running || eng.cranking
+    ? Math.pow(clamp((eng.rpm / cfg.redline) * (0.25 + 0.75 * eng.loadFactor), 0, 1), 2.2)
+    : 0;
+  const headerCol = mixColor('#6e5b4a', '#ff7326', egt * 0.85);
+  const headerHot = mixColor('#8a6f57', '#ffb257', egt * 0.9);
+
+  c.save();
+  if (egt > 0.45) { c.shadowColor = 'rgba(255,110,30,0.75)'; c.shadowBlur = 22 * egt; }
+  c.strokeStyle = headerCol; c.lineWidth = 12; c.lineCap = 'round';
   for (let i = 0; i < n; i++) {
     const cx = lay.cylX[i];
     c.beginPath();
@@ -368,33 +378,49 @@ export function renderCutaway(c, lay, eng, st, controls, now, dt) {
     c.quadraticCurveTo(cx + 52, 200, colX, 246 + i * 10);
     c.stroke();
   }
-  c.strokeStyle = '#8a6f57'; c.lineWidth = 3;
+  c.strokeStyle = headerHot; c.lineWidth = 3;
   for (let i = 0; i < n; i++) {
     const cx = lay.cylX[i];
     c.beginPath(); c.moveTo(cx + 13, lay.deckY - 12); c.quadraticCurveTo(cx + 52, 196, colX, 242 + i * 10); c.stroke();
   }
+  c.restore();
   // collector + tailpipe
-  c.strokeStyle = '#7a6a58'; c.lineWidth = 18;
+  c.save();
+  if (egt > 0.55) { c.shadowColor = 'rgba(255,110,30,0.6)'; c.shadowBlur = 16 * egt; }
+  c.strokeStyle = mixColor('#7a6a58', '#e06a28', egt * 0.6); c.lineWidth = 18;
   c.beginPath(); c.moveTo(colX, 240);
   c.quadraticCurveTo(colX + 8, 330, colX + 8, 430);
   c.quadraticCurveTo(colX + 8, 470, colX + 60, 470);
   c.lineTo(CW + 20, 470);
   c.stroke();
+  c.restore();
   c.strokeStyle = '#4c4036'; c.lineWidth = 3;
   c.beginPath(); c.moveTo(colX - 8, 240); c.quadraticCurveTo(colX, 330, colX, 430); c.stroke();
   // muffler tip
   c.fillStyle = '#9db3c9'; c.fillRect(CW - 34, 458, 34, 24);
   c.fillStyle = '#0c0f16'; c.fillRect(CW - 8, 462, 8, 16);
 
+  // tailpipe flames: overrun crackle / nitrous
+  const flamey = (view.overrun && eng.running) || eng.nosActive;
+  if (flamey) drawFlame(c, CW - 2, 470, eng.nosActive, eng.rpm, now);
+
+  // =================================================
+  // TURBOCHARGER (turbo presets only)
+  // =================================================
+  if (cfg.maxBoost) {
+    st.turboAngle += dt * (eng.rpm * 0.6 + eng.boost * 90000) / 60 * TWO_PI / 10;
+    drawTurbo(c, lay, eng, st.turboAngle, colX);
+  }
+
   // =================================================
   // PARTICLES (intake charge + exhaust smoke)
   // =================================================
-  updateParticles(c, lay, eng, st, controls, now, dt, tbX, colX);
+  updateParticles(c, lay, eng, st, view, now, dt, tbX, colX);
 
   // =================================================
-  // LABELS: stroke chips + specs
+  // LABELS: stroke chips + specs + drive overlay
   // =================================================
-  if (controls.showLabels) {
+  if (view.showLabels) {
     const chips = [
       ['INT', '#3f7fd6'], ['CMP', '#7d8aa3'], ['PWR', '#e0661f'], ['EXH', '#8a7a5f'],
     ];
@@ -413,9 +439,41 @@ export function renderCutaway(c, lay, eng, st, controls, now, dt) {
   // spec strip
   c.fillStyle = '#5c6b85'; c.font = '11px monospace'; c.textAlign = 'left';
   c.fillText(
-    `BORE ${cfg.bore}mm  ·  STROKE ${cfg.stroke}mm  ·  ${cfg.disp}  ·  FIRING ${cfg.firingOrder.join('-')}  ·  ${(720 / n) | 0}° SPACING`,
+    `BORE ${cfg.bore}mm  ·  STROKE ${cfg.stroke}mm  ·  ${cfg.disp}  ·  FIRING ${cfg.firingOrder.join('-')}  ·  ${(720 / n) | 0}° SPACING` +
+    (cfg.maxBoost ? `  ·  TURBO ${cfg.maxBoost.toFixed(1)} bar` : '  ·  N/A'),
     16, CH - 10
   );
+
+  // ---- DRIVE-mode overlay: gear + speed ----
+  if (view.mode === 'drive') {
+    c.save();
+    rr(c, 18, 20, 172, 86, 12);
+    c.fillStyle = 'rgba(10,13,20,0.75)'; c.fill();
+    c.strokeStyle = '#2a3346'; c.lineWidth = 1.5; c.stroke();
+    c.textAlign = 'left';
+    c.fillStyle = '#5c6b85'; c.font = '10px sans-serif';
+    c.fillText('GEAR', 32, 42);
+    c.fillText('SPEED', 108, 42);
+    const shiftFlash = eng.rpm > cfg.redline * 0.85 && eng.running && view.gear > 0 && view.gear < 5;
+    c.fillStyle = shiftFlash && Math.sin(now / 60) > 0 ? '#ff5040' : '#e6edf6';
+    c.font = 'bold 34px monospace';
+    c.fillText(view.gear === 0 ? 'N' : String(view.gear), 34, 80);
+    c.fillStyle = '#e6edf6';
+    c.fillText(String(Math.round(view.speedKmh)), 82, 80);
+    c.fillStyle = '#5c6b85'; c.font = '9px sans-serif';
+    c.fillText('km/h', 152, 80);
+    // shift indicator
+    if (view.shiftPing) {
+      c.fillStyle = 'rgba(255,210,90,0.9)'; c.font = 'bold 12px sans-serif';
+      c.fillText('⇧ SHIFT', 118, 60);
+    }
+    c.restore();
+  }
+
+  // ---- overheating steam ----
+  if (eng.steam && Math.random() < 0.35) {
+    st.smokes.push({ x: lay.X0 + 30 + Math.random() * (lay.X1 - lay.X0 - 60), y: lay.headTop + 4, vy: -0.8 - Math.random() * 0.6, r: 5, a: 0.45, col: '215,225,240' });
+  }
 
   // seized overlay
   if (eng.seized) {
@@ -424,15 +482,15 @@ export function renderCutaway(c, lay, eng, st, controls, now, dt) {
     c.fillText('⚠ ENGINE SEIZED', CW / 2, 120);
     // smoke plume
     if (st.smokes.length < 60 && Math.random() < 0.5) {
-      st.smokes.push({ x: lay.cylX[(Math.random() * n) | 0], y: 300, vy: -0.6 - Math.random(), r: 8, a: 0.5 });
+      st.smokes.push({ x: lay.cylX[(Math.random() * n) | 0], y: 300, vy: -0.6 - Math.random(), r: 8, a: 0.5, col: '140,140,150' });
     }
   }
-  // persistent smoke (seizure)
+  // persistent smoke (seizure / steam)
   for (let i = st.smokes.length - 1; i >= 0; i--) {
     const s = st.smokes[i];
     s.y += s.vy; s.r += 0.35; s.a -= 0.004;
     if (s.a <= 0) { st.smokes.splice(i, 1); continue; }
-    c.fillStyle = `rgba(140,140,150,${s.a})`;
+    c.fillStyle = `rgba(${s.col || '140,140,150'},${s.a})`;
     c.beginPath(); c.arc(s.x, s.y, s.r, 0, TWO_PI); c.fill();
   }
 
@@ -508,8 +566,100 @@ function drawGas(c, lay, i, tc, cx, crownY, eng, now) {
   c.closePath(); c.fill();
 }
 
+// hex color a → b by t
+function mixColor(a, b, t) {
+  const pa = [1, 3, 5].map(i => parseInt(a.substr(i, 2), 16));
+  const pb = [1, 3, 5].map(i => parseInt(b.substr(i, 2), 16));
+  const m = pa.map((v, i) => Math.round(v + (pb[i] - v) * clamp(t, 0, 1)));
+  return `rgb(${m[0]},${m[1]},${m[2]})`;
+}
+
+// tailpipe flame burst
+function drawFlame(c, x, y, isNos, rpm, now) {
+  const flick = 0.75 + Math.random() * 0.5;
+  const len = (10 + rpm / 300) * flick;
+  const cols = isNos
+    ? ['rgba(120,180,255,0.9)', 'rgba(60,110,255,0.5)', 'rgba(30,60,200,0)']
+    : ['rgba(255,240,180,0.95)', 'rgba(255,140,40,0.55)', 'rgba(255,60,10,0)'];
+  c.save();
+  c.globalCompositeOperation = 'lighter';
+  for (let k = 0; k < 3; k++) {
+    const f = 1 - k * 0.3;
+    c.fillStyle = cols[k];
+    c.beginPath();
+    c.moveTo(x, y - 7 * f);
+    c.quadraticCurveTo(x + len * 0.6 * f, y - 5 * f, x + len * f, y + (Math.random() - 0.5) * 4);
+    c.quadraticCurveTo(x + len * 0.6 * f, y + 5 * f, x, y + 7 * f);
+    c.closePath(); c.fill();
+  }
+  c.restore();
+}
+
+// turbocharger: turbine on the exhaust collector, compressor to plenum
+function drawTurbo(c, lay, eng, angle, colX) {
+  const tx = colX - 6, ty = 322;                 // turbine center
+  const kx = tx - 52, ky = ty;                   // compressor center
+  const R = 26;
+
+  // oil/coolant feed lines
+  c.strokeStyle = '#3a4354'; c.lineWidth = 4;
+  c.beginPath(); c.moveTo(tx - 26, ty + 30); c.lineTo(tx - 40, ty + 56); c.stroke();
+
+  // compressor outlet -> charge pipe -> plenum right end
+  c.strokeStyle = '#5a6b8f'; c.lineWidth = 11; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(kx - 8, ky - 20);
+  c.quadraticCurveTo(kx - 60, ky - 60, lay.X1 + 10, lay.plenumY + 20);
+  c.stroke();
+  c.strokeStyle = '#7e93bd'; c.lineWidth = 3;
+  c.beginPath(); c.moveTo(kx - 8, ky - 24);
+  c.quadraticCurveTo(kx - 60, ky - 64, lay.X1 + 10, lay.plenumY + 16);
+  c.stroke();
+  // intercooler brick on the charge pipe
+  c.save();
+  c.translate(kx - 44, ky - 44); c.rotate(-0.8);
+  rr(c, -14, -9, 28, 18, 3);
+  c.fillStyle = '#2c3850'; c.fill(); c.strokeStyle = '#10141f'; c.lineWidth = 1.5; c.stroke();
+  c.strokeStyle = '#46587d'; c.lineWidth = 1;
+  for (let i = -10; i <= 10; i += 4) { c.beginPath(); c.moveTo(i, -8); c.lineTo(i, 8); c.stroke(); }
+  c.restore();
+
+  // housing (turbine + compressor)
+  const spin = (x, y, col1, glow) => {
+    c.save();
+    if (glow > 0.3) { c.shadowColor = 'rgba(255,120,40,0.7)'; c.shadowBlur = 14 * glow; }
+    const hg = c.createRadialGradient(x - 6, y - 6, 2, x, y, R);
+    hg.addColorStop(0, col1); hg.addColorStop(1, '#141a26');
+    c.fillStyle = hg;
+    c.beginPath(); c.arc(x, y, R, 0, TWO_PI); c.fill();
+    c.strokeStyle = '#0d1119'; c.lineWidth = 2; c.stroke();
+    // volute tongue
+    c.fillStyle = col1;
+    c.beginPath(); c.moveTo(x + R - 4, y + 4); c.lineTo(x + R + 12, y + 14); c.lineTo(x + R - 2, y + 16); c.closePath(); c.fill();
+    // impeller
+    c.save(); c.translate(x, y); c.rotate(angle);
+    c.fillStyle = '#c8d4e8';
+    for (let b = 0; b < 7; b++) {
+      c.rotate(TWO_PI / 7);
+      c.beginPath(); c.ellipse(9, 0, 9, 3.4, 0.5, 0, TWO_PI); c.fill();
+    }
+    c.restore();
+    bolt(c, x, y, 5, '#5a6b8f');
+    c.restore();
+  };
+  const heat = clamp(eng.boost / eng.cfg.maxBoost * 0.5 + (eng.loadFactor * eng.rpm / eng.cfg.redline) * 0.6, 0, 1);
+  spin(kx, ky, '#3d4a63', 0);                       // compressor (cold side)
+  spin(tx, ty, mixColor('#4a3d33', '#7a4526', heat), heat); // turbine (hot side)
+  // center cartridge
+  c.fillStyle = '#2c3a55';
+  rr(c, kx + R - 8, ty - 8, tx - kx - 2 * R + 22, 16, 4); c.fill();
+  c.strokeStyle = '#0d1119'; c.stroke();
+  // boost value label
+  c.fillStyle = '#8fa4c8'; c.font = '10px sans-serif'; c.textAlign = 'center';
+  c.fillText(`TURBO ${eng.boost.toFixed(2)} bar`, tx - 24, ty + 48);
+}
+
 // ---------- particles ----------
-function updateParticles(c, lay, eng, st, controls, now, dt, tbX, colX) {
+function updateParticles(c, lay, eng, st, view, now, dt, tbX, colX) {
   const th = eng.theta;
   const running = eng.running || eng.cranking;
   const parts = st.particles;
@@ -520,7 +670,7 @@ function updateParticles(c, lay, eng, st, controls, now, dt, tbX, colX) {
       const tc = mod4pi(th - eng.pinPhase[i]);
       // intake charge in
       const inLift = liftProfile(tc, -30, 245, 9);
-      if (inLift > 2 && tc < Math.PI && parts.length < MAXP && Math.random() < 0.5 * (0.3 + controls.throttle)) {
+      if (inLift > 2 && tc < Math.PI && parts.length < MAXP && Math.random() < 0.5 * (0.3 + view.throttle)) {
         parts.push({ type: 'air', x: tbX + 20, y: lay.plenumY, s: 0, life: 1, cyl: i });
       }
       // exhaust puff out

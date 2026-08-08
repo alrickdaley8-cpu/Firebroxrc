@@ -1,6 +1,6 @@
 // ============================================================
 // engine.js — 4-stroke internal combustion engine physics model
-// Pure logic, no DOM. Units: radians, seconds, N·m, watts.
+// Pure logic, no DOM. Units: radians, seconds, N·m, watts, bar.
 // Cycle phase convention: theta (crank) 0..4π.
 //   Per cylinder cycle θc = (theta − pinPhase) mod 4π:
 //     0   .. π   intake      (piston TDC→BDC)
@@ -21,13 +21,17 @@ export const PRESETS = {
     firingOrder: [1, 2, 3],          // 240° spacing
     bore: 74, stroke: 76,            // mm (flavor text)
     disp: '0.98L',
-    peakTQ: 196, tqPeakRpm: 3000,    // turbo-ish low-end shove
+    peakTQ: 196, tqPeakRpm: 3000,    // boosted figures at full boost
     redline: 6800,
-    idleRpm: 950, idleP: 0.112,
+    idleRpm: 950, idleP: 0.132,
     inertia: 0.085,                  // kg·m²
     fricBase: 10, fricLin: 0.0032, fricQuad: 18,
     starterTQ: 14,
     throaty: 0.35,                   // audio character
+    maxBoost: 1.15,                  // bar gauge (0 = naturally aspirated)
+    turboLag: 1.15,                  // spool time constant factor
+    mass: 980,                       // vehicle kg for DRIVE mode
+    cdA: 0.56,                       // drag area m²
   },
   i4: {
     id: 'i4',
@@ -44,6 +48,10 @@ export const PRESETS = {
     fricBase: 13, fricLin: 0.0033, fricQuad: 20,
     starterTQ: 17,
     throaty: 0.55,
+    maxBoost: 0,
+    turboLag: 0,
+    mass: 1150,
+    cdA: 0.62,
   },
   i6: {
     id: 'i6',
@@ -60,6 +68,10 @@ export const PRESETS = {
     fricBase: 18, fricLin: 0.0036, fricQuad: 24,
     starterTQ: 20,
     throaty: 0.8,
+    maxBoost: 0,
+    turboLag: 0,
+    mass: 1520,
+    cdA: 0.68,
   },
 };
 
@@ -72,7 +84,7 @@ function veShape(rpm, peak) {
 }
 
 function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
-function gaussNorm(x) { return Math.exp(-x * x); }
+function smoothstep(x) { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); }
 
 export class Engine {
   constructor(preset) {
@@ -82,20 +94,33 @@ export class Engine {
     this.ignition = false;
     this.cranking = false;
     this.seized = false;
+    this.stalled = false;
     this.seizeTimer = 0;
     this.flareTimer = 0;         // startup rev flare
     this.running = false;
     this.limitCut = 0;           // 0..1 rev-limiter cut probability
+    this.fuelCut = 0;            // 0..1 starvation ramp
     this.overRedlineTime = 0;
+
+    // systems
+    this.boost = 0;              // bar gauge
+    this.bovPulse = false;       // one-shot flag (main clears)
+    this.fuel = 8.0;             // liters (tank)
+    this.tankSize = 8.0;
+    this.coolant = 18;           // °C
+    this.limp = false;           // overheating power cut
+    this.steam = false;          // visual flag
+    this.nitro = 100;            // nitrous bottle charge %
+    this.nosActive = false;
+    this._prevThr = 0;
+    this.idleI = 0;              // idle-speed integrator (load droop compensation)
 
     // Derived per-preset state
     const n = preset.cylinders;
-    // pinPhase per *cylinder index* (1..n arranged left→right)
     this.pinPhase = new Array(n).fill(0);
     preset.firingOrder.forEach((cylNum, seq) => {
       this.pinPhase[cylNum - 1] = (seq * FOUR_PI) / n;
     });
-    // Vega peak normalization for torque curve
     this.vePeak = veShape(preset.tqPeakRpm, preset.tqPeakRpm);
 
     // Precompute mean of summed power pulses for ripple normalization
@@ -104,44 +129,52 @@ export class Engine {
     this.avgPulse = sum / count;
 
     // Live readouts
-    this.torque = 0;             // net indicated-mean torque (for dyno)
+    this.torque = 0;             // net instantaneous (incl. ripple) — shake
+    this.torqueMean = 0;         // indicated mean
+    this.torqueWheel = 0;        // indicated − friction (>=0) for dyno
+    this.netTorque = 0;          // signed crank torque for drivetrain
     this.power = 0;              // watts
     this.loadFactor = 0;         // effective throttle p 0..1
     this.fires = [];             // fire events since last drain
-    this.shake = 0;              // filtered ripple accel (for mount shake)
-    this.coolant = 20;           // °C flavor
-    this._prevThetaC = new Array(n).fill(0);
+    this.shake = 0;              // filtered ripple accel (mount shake)
+    this._thr = 0;
   }
 
-  // Sum of per-cylinder power pulse shapes at crank angle th
   pulseSum(th) {
     let s = 0;
     for (let i = 0; i < this.cfg.cylinders; i++) {
       let tc = (th - this.pinPhase[i]) % FOUR_PI;
       if (tc < 0) tc += FOUR_PI;
       if (tc >= TWO_PI && tc <= 3 * Math.PI) {
-        const u = (tc - TWO_PI) / Math.PI;         // 0..1 through power stroke
+        const u = (tc - TWO_PI) / Math.PI;
         s += Math.pow(Math.sin(u * Math.PI), 1.6);
       }
     }
     return s;
   }
 
-  // Peak indicated torque the engine could make at wide-open throttle
-  maxIndicatedTorque(rpm) {
+  // steady-state target boost at WOT for a given rpm (bar gauge)
+  targetBoost(rpm, throttle = 1) {
+    const c = this.cfg;
+    if (!c.maxBoost || throttle < 0.2) return 0;
+    return c.maxBoost * smoothstep((rpm - 1300) / 2300) * smoothstep((throttle - 0.2) / 0.3);
+  }
+
+  // Peak indicated torque at WOT (optionally at a given boost fraction 0..1)
+  maxIndicatedTorque(rpm, boostFrac = 1) {
     const c = this.cfg;
     let ve = veShape(rpm, c.tqPeakRpm) / this.vePeak;
-    // gentle valve-float style falloff past redline (engine can still over-rev)
     if (rpm > c.redline) {
       const over = (rpm - c.redline) / c.redline;
       ve *= clamp(1 - over * 1.4, 0.45, 1);
     }
-    return c.peakTQ * ve;
+    let scale = 1;
+    if (c.maxBoost) scale = 1 + 0.85 * boostFrac;   // NA baseline; boost is additive, up to +85%
+    return c.peakTQ * ve * scale;
   }
 
   frictionTorque(rpm) {
     const c = this.cfg;
-    // mechanical friction growth saturates above ~1.12x redline
     const rq = Math.min(rpm, c.redline * 1.12);
     return c.fricBase + c.fricLin * rpm + c.fricQuad * Math.pow(rq / c.redline, 2);
   }
@@ -151,36 +184,69 @@ export class Engine {
     return (deg * Math.PI) / 180;
   }
 
-  // controls: { throttle 0..1, load 0..1, limiterOn bool }
+  // controls: { throttle, load, limiterOn, nos, externalRpm, driveLoad }
   step(dt, controls) {
     const c = this.cfg;
-    const SUB = 8;                          // physics substeps for stability
+    const SUB = 8;
     const h = dt / SUB;
-    this._thr = controls.throttle;
+    const thr = controls.throttle;
+    this._thr = thr;
+
+    // ---------- turbo spool ----------
+    if (c.maxBoost) {
+      const tgt = this.combustionTarget() ? this.targetBoost(this.rpm, thr) : 0;
+      const rate = (tgt > this.boost)
+        ? 1.35 / c.turboLag * clamp(this.rpm / 3000, 0.25, 2.2)
+        : 2.8;
+      this.boost += (tgt - this.boost) * Math.min(1, rate * dt);
+      this.boost = Math.max(0, this.boost);
+      // BOV: throttle snaps shut under boost
+      if (this._prevThr > 0.45 && thr < 0.1 && this.boost > 0.4) {
+        this.bovPulse = true;
+        this.boost *= 0.35;
+      }
+    }
+    this._prevThr = thr;
+
+    // ---------- fuel ----------
+    if (this.running) {
+      const flow = (0.25 + 0.75 * this.loadFactor) * this.rpm * 3.3e-6; // L/s
+      this.fuel = Math.max(0, this.fuel - flow * dt);
+    }
+    if (this.fuel <= 0) this.fuelCut = Math.min(1, this.fuelCut + dt * 0.5);
+    // limp mode with hysteresis: in above 128°C, out below 118°C
+    this.limp = this.limp ? this.coolant > 118 : this.coolant > 128;
+    this.steam = this.coolant > 122;
 
     for (let s = 0; s < SUB; s++) {
       let rpm = this.rpm;
       let T = 0;
+      const slaved = controls.externalRpm != null && !this.seized && !this.stalled;
 
       // --- starter motor ---
       if (this.cranking && this.ignition && !this.seized && rpm < 480) {
         T += c.starterTQ * (1 - rpm / 480) + 6;
+        if (this.stalled && rpm > 40) this.stalled = false;
       }
 
       // --- combustion torque ---
-      const combustionOn = this.ignition && !this.seized && rpm > 30;
+      const combustionOn = this.ignition && !this.seized && !this.stalled && rpm > 30;
       let p = 0;
       if (combustionOn) {
-        // weak cylinder filling at cranking speeds (slow catch, then flare)
         const crankEff = clamp(rpm / 520, 0.2, 1);
-        // idle-speed closed loop when foot is off
-        if (controls.throttle < 0.03) {
-          p = clamp(c.idleP + 0.00038 * (c.idleRpm - rpm), 0.05, 0.30);
-          if (this.flareTimer > 0) p = Math.max(p, 0.24);  // startup flare
+        if (thr < 0.03) {
+          p = clamp(c.idleP + 0.00038 * (c.idleRpm - rpm) + this.idleI, 0.05, 0.30);
+          if (this.flareTimer > 0) p = Math.max(p, 0.24);
         } else {
-          p = clamp(0.10 + 0.92 * controls.throttle, 0, 1);
+          p = clamp(0.10 + 0.92 * thr, 0, 1);
         }
-        // rev limiter: random spark cut
+        // idle integrator: drives steady-state idle error to zero
+        if (thr < 0.03 && this.flareTimer <= 0) {
+          this.idleI = clamp(this.idleI + (c.idleRpm - rpm) * 0.000012 * h, -0.05, 0.09);
+        } else {
+          this.idleI *= 0.9;
+        }
+        // rev limiter
         const soft = c.redline - 200;
         if (controls.limiterOn && rpm > soft) {
           const depth = clamp((rpm - soft) / 300, 0, 1);
@@ -189,41 +255,67 @@ export class Engine {
         } else {
           this.limitCut = Math.max(0, this.limitCut - dt * 6);
         }
-        const meanT = p * crankEff * this.maxIndicatedTorque(rpm);
-        // torque ripple from discrete cylinder events (lumpy at low rpm)
+        // fuel starvation: sputtering ramp to a full cut
+        if (this.fuelCut > 0) {
+          if (Math.random() < this.fuelCut) p = 0;
+          else p *= (1 - this.fuelCut * 0.5);
+        }
+        // limp mode
+        if (this.limp) p = Math.min(p, 0.35);
+
+        const boostFrac = c.maxBoost ? this.boost / c.maxBoost : 1;
+        let meanT = p * crankEff * this.maxIndicatedTorque(rpm, boostFrac);
+        // cold engine: slightly down on power
+        if (this.coolant < 45) meanT *= 0.97;
+        // nitrous
+        this.nosActive = !!(controls.nos && this.nitro > 0 && this.running && thr > 0.3 && !this.limp);
+        if (this.nosActive) meanT *= 1.45;
+
         const mix = clamp(0.15 + rpm / 2200, 0.15, 0.9);
-        const ripple = meanT * 1.35 * this.pulseSum(this.theta) / this.avgPulse;
-        this.torque = meanT * mix + ripple * (1 - mix);
+        // ripple is mean-preserving: fluctuates ±85%·(1−mix) about the mean
+        const rn = this.pulseSum(this.theta) / this.avgPulse;
+        this.torque = meanT * (1 + 0.85 * (rn - 1) * (1 - mix));
         this.torqueMean = meanT;
         T += this.torque;
       } else {
         this.torque = 0;
         this.torqueMean = 0;
-        this.limitCut = 0;
+        this.nosActive = false;
+        this.limitCut = Math.max(0, this.limitCut - dt * 6);
       }
 
       // --- friction & pumping ---
-      T -= this.frictionTorque(rpm);
+      const fric = this.frictionTorque(rpm);
+      T -= fric;
+      this.netTorque = this.torqueMean - fric;
 
-      // --- dyno brake ---
-      const L = controls.load;
-      T -= L * (5 + 0.014 * rpm + 65 * Math.pow(rpm / c.redline, 2));
-      T -= 1.5 + 0.0015 * rpm; // driveline drag
+      // --- dyno brake or drivetrain load ---
+      if (controls.driveLoad != null) {
+        T -= controls.driveLoad;
+      } else {
+        const L = controls.load;
+        T -= L * (5 + 0.014 * rpm + 65 * Math.pow(rpm / c.redline, 2));
+      }
+      T -= 1.5 + 0.0015 * rpm;
 
-      // --- seizure ---
       if (this.seized) T -= 600;
 
-      // --- integrate ---
-      const alpha = T / c.inertia;              // rad/s²
-      let w = (rpm * TWO_PI) / 60 + alpha * h;  // rad/s
-      if (w < 0) w = 0;
+      // --- integrate (or follow drivetrain) ---
+      const alpha = T / c.inertia;
+      let w;
+      if (slaved && !this.cranking) {
+        w = (controls.externalRpm * TWO_PI) / 60;
+      } else {
+        w = (rpm * TWO_PI) / 60 + alpha * h;
+        if (w < 0) w = 0;
+      }
       this.rpm = (w * 60) / TWO_PI;
       const prevTheta = this.theta;
       this.theta = (this.theta + w * h) % FOUR_PI;
       this.shake = this.shake * 0.9 + Math.abs(alpha) * 0.1;
       this.loadFactor = p;
 
-      // --- fire event detection (for visuals) ---
+      // --- fire events ---
       if (combustionOn) {
         const adv = this.sparkAdvanceRad();
         for (let i = 0; i < c.cylinders; i++) {
@@ -232,8 +324,8 @@ export class Engine {
           const sparkAt = TWO_PI - adv;
           const crossed = a0 <= a1
             ? (a0 < sparkAt && a1 >= sparkAt)
-            : (a0 < sparkAt || a1 >= sparkAt);   // wrapped
-          if (crossed && Math.random() >= this.limitCut) {
+            : (a0 < sparkAt || a1 >= sparkAt);
+          if (crossed && Math.random() >= Math.max(this.limitCut, this.fuelCut)) {
             this.fires.push({ cyl: i, time: performanceNowSafe() });
           }
         }
@@ -241,18 +333,16 @@ export class Engine {
     }
 
     // --- bookkeeping ---
-    this.running = this.ignition && !this.seized && this.rpm > 60;
-    if (this.running && this._wasRunning === false && this._wasCrank) {
-      this.flareTimer = 0.7; // just caught
-    }
+    this.running = this.ignition && !this.seized && !this.stalled && this.rpm > 60;
+    if (this.running && this._wasRunning === false && this._wasCrank) this.flareTimer = 0.7;
     this._wasRunning = this.running;
     this._wasCrank = this.cranking;
     if (this.flareTimer > 0) this.flareTimer -= dt;
-    // wheel (net, mean) torque is what the dyno & stats display
-    this.torqueWheel = Math.max(0, (this.torqueMean || 0) - this.frictionTorque(this.rpm));
+    if (this.nosActive) this.nitro = Math.max(0, this.nitro - dt * 9);
+    this.torqueWheel = Math.max(0, this.torqueMean - this.frictionTorque(this.rpm));
     this.power = this.torqueWheel * ((this.rpm * TWO_PI) / 60);
 
-    // over-rev damage when limiter disabled
+    // over-rev damage
     if (!controls.limiterOn && this.running && this.rpm > c.redline * 1.22) {
       this.overRedlineTime += dt;
       if (this.overRedlineTime > 1.1 && !this.seized) {
@@ -263,9 +353,17 @@ export class Engine {
       this.overRedlineTime = Math.max(0, this.overRedlineTime - dt * 0.5);
     }
 
-    // coolant flavor
-    const heat = 24 + (this.rpm / c.redline) * 70 * (0.35 + 0.65 * this.loadFactor);
-    this.coolant += (heat - this.coolant) * 0.01 * dt * 10;
+    // --- cooling system (thermostat fan kicks in at 88°C) ---
+    // heat in ~ fuel throughput (rpm x cylinder charge); radiator sheds to ambient
+    const heatIn = 58 + (this.rpm / c.redline) * this.loadFactor * 62 + (this.nosActive ? 12 : 0);
+    const rad = this.coolant > 88 ? (this.coolant - 88) * 1.6 : 0;
+    const kTherm = this.coolant < 70 ? 0.02 : 0.011;
+    this.coolant += (heatIn - 24 - rad) * kTherm * dt;
+    if (this.coolant < 18) this.coolant = 18;
+  }
+
+  combustionTarget() {
+    return this.ignition && !this.seized && !this.stalled;
   }
 
   drainFires() {
@@ -274,12 +372,12 @@ export class Engine {
     return f;
   }
 
-  // Theoretical dyno curves for the dyno chart
   dynoCurve() {
     const pts = [];
     const c = this.cfg;
     for (let r = 800; r <= c.redline + 400; r += 100) {
-      const T = Math.max(0, this.maxIndicatedTorque(r) - this.frictionTorque(r));
+      const bf = c.maxBoost ? this.targetBoost(r) / c.maxBoost : 1;
+      const T = Math.max(0, this.maxIndicatedTorque(r, bf) - this.frictionTorque(r));
       pts.push({ rpm: r, tq: T, kw: (T * r * TWO_PI) / 60 / 1000 });
     }
     return pts;
