@@ -28,7 +28,9 @@ export class Vehicle {
     this.gear = 0;               // 0 = N, 1..5
     this.shiftT = 0;             // >0 while clutch is open mid-shift
     this.shiftPing = false;      // one-shot flag (main clears)
+    this.blipPing = false;       // one-shot rev-match flag (main clears)
     this.wheelspin = 0;          // 0..1 tire-slip fraction this frame
+    this.topKmh = 0;             // fastest speed seen this vehicle
     this.dist = 0;
 
     // performance timers
@@ -54,6 +56,8 @@ export class Vehicle {
     if (this.shiftT > 0) return;
     const g = Math.min(5, Math.max(0, this.gear + dir));
     if (g === this.gear) return;
+    // rev-match blip on downshift while rolling with clutch engaged
+    if (dir < 0 && g > 0 && this.v >= SLIP_V) this.blipPing = true;
     this.gear = g;
     this.shiftT = SHIFT_TIME;
     this.shiftPing = true;
@@ -65,7 +69,13 @@ export class Vehicle {
 
   // Returns coupling for engine.step: { externalRpm, driveLoad }
   couple(engine) {
-    if (this.gear === 0 || this.shiftT > 0 || engine.seized || engine.stalled || !engine.ignition) {
+    if (this.gear === 0 || this.shiftT > 0 || engine.seized || !engine.ignition) {
+      return { externalRpm: null, driveLoad: null };
+    }
+    if (engine.stalled) {
+      // dead engine, wheels turning, clutch engaged -> driveline cranks it
+      // (engine.js push-start catch fires it up above ~550 rpm)
+      if (this.v > 0.8) return { externalRpm: this.lockRpm(), driveLoad: 8 };
       return { externalRpm: null, driveLoad: null };
     }
     if (this.v < SLIP_V) {
@@ -107,15 +117,25 @@ export class Vehicle {
           fEng = cap + (fEng - cap) * 0.25;
         }
       }
+    } else if (this.gear > 0 && this.shiftT <= 0 && this.v >= SLIP_V) {
+      // dead or cut engine turned by the wheels: pumping drag (engine braking)
+      if (engine.seized) {
+        fEng = -this.mass * G * MU;      // locked internals = locked wheels
+      } else if (engine.stalled || !engine.combustionTarget()) {
+        const fr = engine.frictionTorque ? engine.frictionTorque(engine.rpm) : 12;
+        fEng = -(fr * ratio * EFF) / WHEEL_R * 0.7;
+      }
     }
 
     const a = (fEng - this.resistForce()) / this.mass;
     this.v = Math.max(0, this.v + a * dt);
     this.dist += this.v * dt;
+    if (this.kmh() > this.topKmh) this.topKmh = this.kmh();
 
-    // stall: lugged below idle once the clutch is fully engaged
-    if (this.gear > 0 && this.shiftT <= 0 && engine.ignition && !engine.seized) {
-      if (this.v >= SLIP_V && engine.rpm < 430) {
+    // stall: lugged below idle while nearly stopped (clutch fully out).
+    // Above walking pace the turning wheels just push-start it instead.
+    if (this.gear > 0 && this.shiftT <= 0 && engine.ignition && !engine.seized && !engine.stalled) {
+      if (this.v >= SLIP_V && this.v < 4.5 && engine.rpm < 430) {
         engine.stalled = true;
       }
     }

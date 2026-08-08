@@ -195,6 +195,7 @@ aside { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .timers { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
 .timers span { font-size: 10px; color: var(--dim); }
 .timers b { color: var(--acc); font-family: Consolas, monospace; font-size: 11px; }
+.timers .pb { font-style: normal; font-size: 9px; color: #b08cff; opacity: 0.9; }
 
 .bars { display: flex; flex-direction: column; gap: 3px; }
 .bar {

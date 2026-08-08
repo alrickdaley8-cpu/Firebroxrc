@@ -227,7 +227,8 @@ export class Engine {
     for (let s = 0; s < SUB; s++) {
       let rpm = this.rpm;
       let T = 0;
-      const slaved = controls.externalRpm != null && !this.seized && !this.stalled;
+      // follow the driveline even while stalled — the wheels push-crank it
+      const slaved = controls.externalRpm != null && !this.seized;
 
       // --- starter motor ---
       if (this.cranking && this.ignition && !this.seized && rpm < 480) {
@@ -316,6 +317,11 @@ export class Engine {
         if (w < 0) w = 0;
       }
       this.rpm = (w * 60) / TWO_PI;
+      // push-start catch: wheels cranking the dead engine fast enough fires it up
+      if (this.stalled && this.ignition && !this.seized && slaved && this.rpm > 550) {
+        this.stalled = false;
+        this.flareTimer = 0.25;
+      }
       const prevTheta = this.theta;
       this.theta = (this.theta + w * h) % FOUR_PI;
       this.shake = this.shake * 0.9 + Math.abs(alpha) * 0.1;

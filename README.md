@@ -53,8 +53,17 @@ time and it flies.
 - **Fuel system** — 8.0 L tank, load-dependent consumption, sputtering starvation,
   dead stop, refuel & re-crank.
 - **Nitrous** — hold-to-spray +45% power (and blue flames), bottle drains in ~11 s.
-- **Failures** — redline abuse seizes the motor (rebuild button); lugging stalls it
-  (re-crank); overheating limps it (cool it down).
+- **Failures** — redline abuse seizes the motor (rebuild button); lugging to a
+  stop stalls it (the wheels push-crank the dead engine — it re-fires with a
+  judder if you're rolling fast enough); overheating limps it (cool it down).
+- **Driver aids that feel real** — rev-match downshift blips, engine-braking with
+  a dead or closed engine, locked-wheel skid physics if you seize the motor at speed.
+- **Records & milestones** — personal bests per engine persist between sessions
+  (0–100, ¼-mile, top speed), plus toast callouts for full boost, burnouts,
+  overheating, low fuel, 100/200 km/h.
+- **Bulletproof audio unlock** — the worklet param map is generated from the node
+  itself (a missing param can never silently kill the whole mix again), every
+  write is guarded, and a 🔊 toast confirms the moment engine audio goes live.
 - **Synthesized audio** — AudioWorklet pulse train timed from real firing angles,
   filtered noise, sub-rumble, exhaust drone at the firing frequency, starter whine,
   limiter sputter, overrun crackle with occasional **full backfire BANGs**, turbo

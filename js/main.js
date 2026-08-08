@@ -10,6 +10,13 @@ import { initUI } from './ui.js';
 
 const $ = id => document.getElementById(id);
 
+// ---------- personal bests (persisted per preset in localStorage) ----------
+const PB_KEY = 'firebrox.pb.v1';
+let PB = {};
+try { PB = JSON.parse(localStorage.getItem(PB_KEY) || '{}') || {}; } catch (_) { PB = {}; }
+function savePB() { try { localStorage.setItem(PB_KEY, JSON.stringify(PB)); } catch (_) { /* private mode */ } }
+function pbFor(id) { return PB[id] || (PB[id] = {}); }
+
 // ---------- canvas helpers ----------
 function resizeOnce(cv, w, h) {
   if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
@@ -37,6 +44,7 @@ const app = {
   vehicle: new Vehicle(PRESETS.i4),
   audio: new EngineAudio(),
   mode: 'dyno',                                   // 'dyno' | 'drive'
+  presetId: 'i4',
   controls: { throttle: 0, load: 0.12, limiterOn: true, showLabels: true, nos: false },
   cutaway: makeCutawayState(),
   layout: makeLayout(PRESETS.i4.cylinders),
@@ -45,7 +53,9 @@ const app = {
   thrSm: 0,
   rpmSm: 0,
   spinSm: 0,
+  blipT: 0,
   eventShake: 0,
+  flags: {},
   flash: { msg: '', until: 0 },
 
   setFlash(msg, ttl = 3.2) {
@@ -55,6 +65,8 @@ const app = {
   setPreset(id) {
     const p = PRESETS[id];
     if (!p || p === this.engine.cfg) return;
+    this.presetId = id;
+    this.flags = {};
     this.engine = new Engine(p);
     this.vehicle = new Vehicle(p);
     this.layout = makeLayout(p.cylinders);
@@ -93,8 +105,12 @@ const st = {
   gear: $('stGear'), speed: $('stSpeed'), boost: $('stBoost'), boostBar: $('boostBarFill'),
   fuelBar: $('fuelBarFill'), fuelL: $('stFuelL'), nosBar: $('nosBarFill'),
   t0100: $('stT0100'), quarter: $('stQuarter'), dist: $('stDist'),
+  top: $('stTop'), pb0100: $('pb0100'), pbQuarter: $('pbQuarter'), pbTop: $('pbTop'),
   rebuild: $('btnRebuild'), hint: $('overlayHint'), flashEl: $('flashMsg'),
 };
+
+// audio unlock toast (fires once, first user gesture)
+app.audio.onUnlock = () => app.setFlash('🔊 AUDIO LIVE — engine sound ready', 2.5);
 
 // ---------- audio fire-angle sync ----------
 function pushFireAngles() {
@@ -127,6 +143,11 @@ function loop(now) {
   const rate = 6 * dt;
   app.thrSm += Math.max(-rate, Math.min(rate, app.controls.throttle - app.thrSm));
 
+  // rev-match blip on downshift (drive mode) — brief auto-throttle during the shift
+  if (veh.blipPing) { veh.blipPing = false; app.blipT = 0.24; }
+  app.blipT = Math.max(0, app.blipT - dt);
+  const thrEff = app.blipT > 0 ? Math.max(app.thrSm, 0.55) : app.thrSm;
+
   // drivetrain coupling (DRIVE mode)
   const coupling = app.mode === 'drive'
     ? veh.couple(en)
@@ -134,7 +155,7 @@ function loop(now) {
 
   const ctl = {
     ...app.controls,
-    throttle: app.thrSm,
+    throttle: thrEff,
     externalRpm: coupling.externalRpm,
     driveLoad: coupling.driveLoad,
   };
@@ -147,10 +168,43 @@ function loop(now) {
   if (en.flutterPulse) { en.flutterPulse = false; app.audio.flutter(); app.eventShake = Math.max(app.eventShake, 0.4); }
   if (veh.shiftPing) { veh.shiftPing = false; app.audio.shift(); app.eventShake = Math.max(app.eventShake, 0.7); }
   if (veh.justFinished) {
-    if (veh.justFinished === '0100') app.setFlash(`0–100 km/h in ${veh.last0100.toFixed(1)}s 🏁`, 4.5);
-    if (veh.justFinished === 'quarter') app.setFlash(`¼ MILE: ${veh.lastQuarter.t.toFixed(2)}s @ ${veh.lastQuarter.trap.toFixed(0)} km/h 🏆`, 5.5);
+    const pb = pbFor(app.presetId);
+    if (veh.justFinished === '0100') {
+      const isPB = pb.b0100 == null || veh.last0100 < pb.b0100;
+      if (isPB) { pb.b0100 = veh.last0100; savePB(); }
+      app.setFlash(`${isPB ? '🏁 NEW PB — ' : ''}0–100 km/h in ${veh.last0100.toFixed(1)}s`, 4.5);
+    }
+    if (veh.justFinished === 'quarter') {
+      const isPB = !pb.bQ || veh.lastQuarter.t < pb.bQ.t;
+      if (isPB) { pb.bQ = { t: veh.lastQuarter.t, trap: veh.lastQuarter.trap }; savePB(); }
+      app.setFlash(`${isPB ? '🏆 NEW PB — ' : ''}¼ MILE: ${veh.lastQuarter.t.toFixed(2)}s @ ${veh.lastQuarter.trap.toFixed(0)} km/h`, 5.5);
+    }
     veh.justFinished = null;
   }
+
+  // ---- milestone toasts (once per preset load / condition resets) ----
+  const F = app.flags;
+  if (!F.fullBoost && en.cfg.maxBoost && en.running && en.boost > en.cfg.maxBoost * 0.97) {
+    F.fullBoost = true; app.setFlash('💨 FULL BOOST', 3);
+  }
+  if (!F.steamWarn && en.steam) {
+    F.steamWarn = true; app.setFlash('♨ OVERHEATING — back off or she goes into limp!', 4);
+  }
+  if (en.fuel > 4) F.lowFuel = false;
+  if (!F.lowFuel && en.fuel < 1.2 && en.ignition) {
+    F.lowFuel = true; app.setFlash('⛽ LOW FUEL — press F to refuel', 4);
+  }
+  if (!F.burnout && app.spinSm > 0.55) {
+    F.burnout = true; app.setFlash('🔥 BURNOUT!', 2.5);
+  }
+  const pb = pbFor(app.presetId);
+  if (app.mode === 'drive' && veh.topKmh > ((pb.top || 0) + 2)) {
+    pb.top = veh.topKmh; savePB();
+    app.setFlash(`⚡ NEW TOP SPEED: ${Math.round(veh.topKmh)} km/h`, 3.5);
+  }
+  if (!F.spd100 && veh.kmh() >= 100) { F.spd100 = true; app.setFlash('💯 100 km/h', 2); }
+  if (!F.spd200 && veh.kmh() >= 200) { F.spd200 = true; app.setFlash('🚀 200 KM/H', 2.5); }
+
   app.eventShake *= Math.exp(-dt * 5);
 
   // wheelspin level (drive mode only), smoothed for audio + visuals
@@ -220,6 +274,10 @@ function loop(now) {
   st.quarter.textContent = veh.bestQuarter != null
     ? `${veh.bestQuarter.t.toFixed(2)} s @ ${veh.bestQuarter.trap.toFixed(0)}`
     : '—';
+  st.top.textContent = Math.round(veh.topKmh);
+  st.pb0100.textContent = pb.b0100 != null ? 'PB ' + pb.b0100.toFixed(2) : '';
+  st.pbQuarter.textContent = pb.bQ != null ? 'PB ' + pb.bQ.t.toFixed(2) : '';
+  st.pbTop.textContent = pb.top != null ? 'PB ' + Math.round(pb.top) : '';
 
   // flash toast
   const flashOn = now < app.flash.until;
