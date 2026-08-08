@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FIREBROX · 4-Stroke Engine Simulator</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🔥</text></svg>" />
+</head>
+<body>
+  <header>
+    <div class="logo">FIREBROX<span>·RC</span></div>
+    <div class="subtitle">4-Stroke Internal Combustion Engine Simulator</div>
+    <div class="spacer"></div>
+    <div id="presetBtns" class="preset-btns">
+      <button data-preset="i3">I3 1.0T</button>
+      <button data-preset="i4">I4 2.0</button>
+      <button data-preset="i6">I6 3.0</button>
+    </div>
+    <div id="stStatus" class="pill">OFF</div>
+  </header>
+
+  <main>
+    <section class="stage">
+      <canvas id="cv"></canvas>
+      <div id="overlayHint">
+        <div class="hint-card">
+          <h2 id="engineName">2.0L Inline-4</h2>
+          <p><b>1.</b> Press <kbd>SPACE</kbd> or the IGNITION button</p>
+          <p><b>2.</b> Hold <kbd>ENTER</kbd> or the STARTER button to crank</p>
+          <p><b>3.</b> Rev with the throttle slider or <kbd>↑</kbd>/<kbd>↓</kbd></p>
+          <p class="dim">Turn sound on for full effect 🔊</p>
+        </div>
+      </div>
+    </section>
+
+    <aside>
+      <div class="panel tach-panel">
+        <canvas id="tachCv"></canvas>
+      </div>
+
+      <div class="panel stats">
+        <div class="stat"><label>RPM</label><b id="stRpm">0</b></div>
+        <div class="stat"><label>TORQUE</label><b id="stTq">—</b></div>
+        <div class="stat"><label>POWER</label><b id="stKw">—</b></div>
+        <div class="stat"><label>FIRING</label><b id="stFires">—</b></div>
+        <div class="stat"><label>COOLANT</label><b id="stCoolant">20 °C</b></div>
+        <div class="stat"><label>RUN PEAK</label><b id="stPeak">—</b></div>
+      </div>
+
+      <div class="panel controls">
+        <div class="row btns">
+          <button id="btnIgn" class="big-toggle">IGNITION OFF</button>
+          <button id="btnStarter" class="starter">⚡ STARTER (HOLD)</button>
+        </div>
+        <div class="row">
+          <label>THROTTLE</label>
+          <input id="rngThrottle" type="range" min="0" max="100" value="0" />
+          <b id="valThrottle">0%</b>
+        </div>
+        <div class="row">
+          <label>DYNO LOAD</label>
+          <input id="rngLoad" type="range" min="0" max="100" value="12" />
+          <b id="valLoad">12%</b>
+        </div>
+        <div class="row checks">
+          <label><input id="chkLimiter" type="checkbox" checked /> Rev limiter</label>
+          <label><input id="chkSound" type="checkbox" checked /> Sound</label>
+          <label><input id="chkLabels" type="checkbox" checked /> Labels</label>
+        </div>
+        <div class="row">
+          <button id="btnRebuild" class="rebuild" hidden>🔧 REBUILD ENGINE</button>
+        </div>
+      </div>
+
+      <div class="panel dyno-panel">
+        <h3>DYNO · torque &amp; power vs rpm</h3>
+        <canvas id="dynoCv"></canvas>
+      </div>
+    </aside>
+  </main>
+
+  <footer>
+    <span><kbd>SPACE</kbd> ignition</span>
+    <span><kbd>ENTER</kbd> hold = crank</span>
+    <span><kbd>↑</kbd><kbd>↓</kbd> throttle</span>
+    <span><kbd>L</kbd> limiter</span>
+    <span><kbd>M</kbd> mute</span>
+    <span><kbd>R</kbd> rebuild</span>
+    <span class="warn-note">⚠ no limiter + sustained over-rev = seized engine</span>
+  </footer>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
