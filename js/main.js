@@ -8,6 +8,7 @@ import { EngineAudio } from './audio.js';
 import { makeLayout, makeCutawayState, renderCutaway, drawTach, drawDyno, CW, CH } from './render.js';
 import { initUI } from './ui.js';
 import { buildPreset, MOD_BY_ID } from './mods.js';
+import { buildCustom } from './builder.js';
 
 const $ = id => document.getElementById(id);
 
@@ -23,10 +24,26 @@ const MODS_KEY = 'firebrox.mods.v1';
 let modsStore = {};
 try { modsStore = JSON.parse(localStorage.getItem(MODS_KEY) || '{}') || {}; } catch (_) { modsStore = {}; }
 function saveMods() { try { localStorage.setItem(MODS_KEY, JSON.stringify(modsStore)); } catch (_) { /* private mode */ } }
-function moddedCfg(id) { return buildPreset(PRESETS[id], modsStore[id] || []); }
+
+// ---------- custom engine (persisted builder spec) ----------
+const CUSTOM_KEY = 'firebrox.custom.v1';
+let customSpec = null;
+try { customSpec = JSON.parse(localStorage.getItem(CUSTOM_KEY) || 'null'); } catch (_) { customSpec = null; }
+function saveCustom() { try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(customSpec)); } catch (_) { /* private mode */ } }
+
+// base (unmodded) cfg for any engine slot
+function baseCfgOf(id) {
+  if (id === 'custom') return customSpec ? buildCustom(customSpec) : null;
+  return PRESETS[id] || null;
+}
+
+function moddedCfg(id) {
+  const base = baseCfgOf(id);
+  return base ? buildPreset(base, modsStore[id] || []) : null;
+}
 function newRig(id) {
   const cfg = moddedCfg(id);
-  return { cfg, engine: new Engine(cfg), vehicle: new Vehicle(cfg) };
+  return cfg ? { cfg, engine: new Engine(cfg), vehicle: new Vehicle(cfg) } : null;
 }
 
 const rig0 = newRig('i4');
@@ -79,16 +96,40 @@ const app = {
   },
 
   setPreset(id) {
-    const p = PRESETS[id];
-    if (!p || (p === this.engine.cfg && !(modsStore[id] || []).length)) return;
+    const p = baseCfgOf(id);
+    if (!p) return;
     this.presetId = id;
     this.rebuildEngine(`ENGINE SWAPPED: ${p.name}${(modsStore[id] || []).length ? ' (modded)' : ''}`);
+  },
+
+  // Engine Builder: install a custom-engine spec, swap to it
+  applyCustom(spec) {
+    customSpec = { ...spec };
+    saveCustom();
+    this.refreshCustomButton();
+    this.setPreset('custom');
+  },
+
+  baseCfg() { return baseCfgOf(this.presetId); },
+
+  getCustomSpec() { return customSpec ? { ...customSpec } : null; },
+
+  refreshCustomButton() {
+    const btn = $('btnCustom');
+    if (!btn) return;
+    btn.classList.toggle('hidden', !customSpec);
+    if (customSpec) {
+      const c = buildCustom(customSpec);
+      btn.textContent = `★ ${c.short}`;
+      btn.title = c.name;
+    }
   },
 
   // swap engine+vehicle for current preset (with its installed mods).
   // Used by setPreset, applyMods, and ignition-off swaps.
   rebuildEngine(flashMsg) {
     const rig = newRig(this.presetId);
+    if (!rig) return;
     this.flags = {};
     this.engine = rig.engine;
     this.vehicle = rig.vehicle;
@@ -100,7 +141,7 @@ const app = {
     document.querySelectorAll('#presetBtns button').forEach(b =>
       b.classList.toggle('active', b.dataset.preset === this.presetId));
     const modIds = modsStore[this.presetId] || [];
-    $('engineName').textContent = PRESETS[this.presetId].name +
+    $('engineName').textContent = baseCfgOf(this.presetId).name +
       (modIds.length ? ` +${modIds.length} mods` : '');
     if (flashMsg) this.setFlash(flashMsg);
   },
@@ -135,6 +176,7 @@ initUI(app);
 app.audio.onState = () => { if (app.refreshAudioPill) app.refreshAudioPill(); };
 
 document.querySelector('#presetBtns button[data-preset="i4"]').classList.add('active');
+app.refreshCustomButton();
 $('engineName').textContent = PRESETS.i4.name +
   ((modsStore.i4 || []).length ? ` +${modsStore.i4.length} mods` : '');
 

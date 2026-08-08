@@ -4,6 +4,7 @@
 
 import { PRESETS } from './engine.js';
 import { modsFor } from './mods.js';
+import { buildCustom, CYL_OPTIONS, TUNES } from './builder.js';
 
 export function initUI(app) {
   const $ = id => document.getElementById(id);
@@ -215,10 +216,12 @@ export function initUI(app) {
   const selected = new Set();
 
   const openModShop = () => {
-    const base = PRESETS[app.presetId];
+    const base = app.baseCfg();
+    if (!base) return;
     selected.clear();
     for (const id of app.getModIds()) selected.add(id);
     modFor.textContent = `— ${base.name}`;
+    prefillBuilder();
 
     modGrid.innerHTML = '';
     for (const m of modsFor(base)) {
@@ -243,6 +246,66 @@ export function initUI(app) {
     closeModShop();
   });
   modShop.addEventListener('click', e => { if (e.target === modShop) closeModShop(); });
+
+  // ---------- ENGINE BUILDER ----------
+  const builderSpec = { cyls: 6, bore: 86, stroke: 86, tune: 'sport', turbo: false };
+  const cylSeg = $('cylSeg'), tuneSeg = $('tuneSeg');
+  const rngBore = $('rngBore'), rngStroke = $('rngStroke');
+  const valBore = $('valBore'), valStroke = $('valStroke');
+  const chkTurboB = $('chkTurbo'), buildSpecEl = $('buildSpec');
+
+  CYL_OPTIONS.forEach(n => {
+    const b = document.createElement('button');
+    b.textContent = n; b.dataset.v = n;
+    b.addEventListener('click', () => { app.audio.init(); builderSpec.cyls = n; syncBuilder(); });
+    cylSeg.appendChild(b);
+  });
+  for (const k of Object.keys(TUNES)) {
+    const b = document.createElement('button');
+    b.textContent = TUNES[k].label; b.dataset.v = k;
+    b.addEventListener('click', () => { app.audio.init(); builderSpec.tune = k; syncBuilder(); });
+    tuneSeg.appendChild(b);
+  }
+
+  function syncBuilder() {
+    builderSpec.bore = +rngBore.value;
+    builderSpec.stroke = +rngStroke.value;
+    builderSpec.turbo = chkTurboB.checked;
+    valBore.textContent = builderSpec.bore;
+    valStroke.textContent = builderSpec.stroke;
+    cylSeg.querySelectorAll('button').forEach(b => b.classList.toggle('active', +b.dataset.v === builderSpec.cyls));
+    tuneSeg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.v === builderSpec.tune));
+    const cfg = buildCustom(builderSpec);
+    const estKw = Math.round(cfg.peakTQ * cfg.redline * 0.64 / 9549);
+    buildSpecEl.innerHTML =
+      `<b>${cfg.cylinders} CYLINDER${cfg.cylinders > 1 ? 'S' : ''} · ${cfg.disp}</b> — ${cfg.name}<br>` +
+      `${cfg.peakTQ} N·m @ ${cfg.tqPeakRpm} rpm · ≈${estKw} kW · redline ${cfg.redline} · idle ${cfg.idleRpm}` +
+      (cfg.maxBoost ? ` · TURBO ${cfg.maxBoost.toFixed(1)} bar, lag ${cfg.turboLag.toFixed(1)}s` : ' · naturally aspirated');
+  }
+  rngBore.addEventListener('input', syncBuilder);
+  rngStroke.addEventListener('input', syncBuilder);
+  chkTurboB.addEventListener('change', () => { app.audio.init(); syncBuilder(); });
+
+  $('btnBuild').addEventListener('click', () => {
+    app.audio.init();
+    const spec = { ...builderSpec };
+    app.applyCustom(spec);
+    closeModShop();
+    app.setFlash(`🔥 CUSTOM ENGINE BUILT & FIRED UP — ${buildCustom(spec).name}`, 4.5);
+  });
+
+  // prefill builder from the saved custom engine, if any
+  const prefillBuilder = () => {
+    const cs = app.getCustomSpec();
+    if (cs) {
+      Object.assign(builderSpec, cs);
+      rngBore.value = cs.bore;
+      rngStroke.value = cs.stroke;
+      chkTurboB.checked = !!cs.turbo;
+    }
+    syncBuilder();
+  };
+  prefillBuilder();
 
   // instructions card: tap anywhere on it to dismiss (H brings it back)
   $('overlayHint').addEventListener('pointerdown', () => {

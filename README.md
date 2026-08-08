@@ -63,6 +63,24 @@ Install **any combination of upgrades** — they stack, and persist per engine:
 
 All-in I-4 build: ~357 kW, **4.7 s 0–100, 12.4 s ¼-mile @ 217 km/h**.
 
+## ⚙ Engine Builder (inside Mod Shop, press T)
+
+Design **any engine** — cylinder count **3 / 4 / 5 / 6 / 8 / 10 / 12**, bore,
+stroke, tune (street/sport/race) and turbo or naturally-aspirated:
+
+- **Physics is derived, not faked** — displacement from actual bore × stroke ×
+  cylinders, torque from the tune's N·m/L, redline from bore/stroke ratio +
+  count, inertia, friction, idle speed, sound character and car weight all
+  computed from your dimensions.
+- **Real firing behavior per engine** — even-fire 720°/n spacing, classic
+  firing orders (1-5-4-8-6-3-7-2 on the 8-cyl…), firing pulses, idle lope and
+  exhaust note scale with your cylinder count. A V12-hum is a 12-cylinder hum.
+- The custom engine persists, gets its own **★ CUSTOM** header button, has its
+  own PB records, and accepts **all Mod Shop upgrades** on top.
+
+Example: 8-cyl 4.7L sport → ~430 N·m, high-rev oversquare screamer; 12-cyl 6.6L
+race → 770+ N·m; 5-cyl 2.4L street turbo → turbo warble in a volvo-voice.
+
 ## Simulation features
 
 - **Crank dynamics** — flywheel inertia, per-cylinder torque ripple at true firing

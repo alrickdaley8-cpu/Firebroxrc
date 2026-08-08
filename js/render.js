@@ -10,8 +10,13 @@ import { TWO_PI, FOUR_PI } from './engine.js';
 export const CW = 980;   // cutaway logical width
 export const CH = 620;   // cutaway logical height
 
-// ---------- geometry (rebuilt per preset) ----------
+// ---------- geometry (rebuilt per preset; auto-shrinks for big cylinder counts) ----------
 export function makeLayout(nCyl, borePx = 88, gapPx = 26) {
+  if (nCyl > 6) {                       // fit I8/I10/I12 banks on one screen
+    const pitch = Math.floor(760 / nCyl);
+    borePx = Math.max(38, pitch - 22);
+    gapPx = pitch - borePx;
+  }
   const pitch = borePx + gapPx;
   const rowW = (nCyl - 1) * pitch + borePx;
   const x0 = (CW - rowW) / 2;

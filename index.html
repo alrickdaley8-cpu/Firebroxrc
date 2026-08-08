@@ -8,7 +8,7 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🔥</text></svg>" />
 </head>
 <body>
-  <header>
+    <header>
     <div class="logo">FIREBROX<span>·RC</span></div>
     <div class="subtitle">4-Stroke Engine Simulator</div>
     <div class="spacer"></div>
@@ -17,6 +17,7 @@
       <button data-preset="i3">I3 1.0T</button>
       <button data-preset="i4">I4 2.0</button>
       <button data-preset="i6">I6 3.0</button>
+      <button data-preset="custom" id="btnCustom" class="hidden">★ CUSTOM</button>
     </div>
     <div id="stStatus" class="pill">OFF</div>
   </header>
@@ -150,6 +151,31 @@
       <h2>🔧 MOD SHOP <small id="modFor"></small></h2>
       <p class="dim small">Pick any upgrades — they stack. Installing rebuilds the engine cold (fuel &amp; nos refilled).</p>
       <div id="modGrid" class="mod-grid"></div>
+
+      <!-- ENGINE BUILDER -->
+      <div class="builder">
+        <h3>⚙ ENGINE BUILDER <small>— design any engine</small></h3>
+        <div class="build-row">
+          <label>CYLINDERS</label>
+          <div id="cylSeg" class="seg"></div>
+        </div>
+        <div class="build-row">
+          <label>BORE <b id="valBore">86</b> mm</label>
+          <input id="rngBore" type="range" min="60" max="110" value="86" />
+        </div>
+        <div class="build-row">
+          <label>STROKE <b id="valStroke">86</b> mm</label>
+          <input id="rngStroke" type="range" min="70" max="112" value="86" />
+        </div>
+        <div class="build-row">
+          <label>TUNE</label>
+          <div id="tuneSeg" class="seg"></div>
+          <label class="build-turbo"><input id="chkTurbo" type="checkbox" /> TURBO</label>
+        </div>
+        <div id="buildSpec" class="build-spec">—</div>
+        <button id="btnBuild" class="build-fire">🔥 FIRE UP THIS ENGINE</button>
+      </div>
+
       <div class="modal-actions">
         <button id="btnApplyMods" class="apply">🔩 INSTALL &amp; REBUILD</button>
         <button id="btnCloseMods">CANCEL</button>

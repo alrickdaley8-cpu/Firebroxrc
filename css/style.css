@@ -269,6 +269,37 @@ aside { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 }
 @media (max-width: 640px) { .mod-grid { grid-template-columns: 1fr; } }
 
+.hidden { display: none !important; }
+
+/* ---------- engine builder ---------- */
+.builder { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 10px; }
+.builder h3 { font-size: 14px; margin-bottom: 6px; }
+.builder h3 small { color: var(--dim); font-size: 10px; font-weight: 400; }
+.build-row { display: flex; align-items: center; gap: 10px; margin: 8px 0; flex-wrap: wrap; }
+.build-row > label { font-size: 11px; color: var(--dim); min-width: 118px; }
+.build-row .seg { display: flex; gap: 4px; flex-wrap: wrap; }
+.build-row .seg button {
+  padding: 6px 10px; font-size: 12px; background: var(--panel2);
+  border: 1px solid var(--line); border-radius: 6px; color: var(--txt); cursor: pointer;
+}
+.build-row .seg button.active {
+  border-color: var(--acc); color: var(--acc);
+  box-shadow: 0 0 8px rgba(255, 123, 36, 0.25);
+}
+.build-row input[type=range] { flex: 1; min-width: 140px; }
+.build-turbo { font-size: 12px; color: var(--txt); display: flex; gap: 6px; align-items: center; margin-left: auto; }
+.build-spec {
+  font-family: Consolas, monospace; font-size: 11px; color: var(--cyan);
+  background: var(--panel2); border: 1px dashed var(--line); border-radius: 8px;
+  padding: 8px 10px; margin: 10px 0; line-height: 1.5;
+}
+.build-fire {
+  width: 100%; padding: 12px; font-weight: 800; font-size: 14px;
+  background: linear-gradient(180deg, var(--acc), #c2520a); color: #fff;
+  border: none; border-radius: 8px; cursor: pointer;
+}
+.build-fire:active { transform: translateY(1px); }
+
 .bars { display: flex; flex-direction: column; gap: 3px; }
 .bar {
   height: 7px; border-radius: 4px; background: #0c1018;
