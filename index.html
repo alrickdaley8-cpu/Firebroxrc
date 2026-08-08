@@ -12,6 +12,7 @@
     <div class="logo">FIREBROX<span>·RC</span></div>
     <div class="subtitle">4-Stroke Engine Simulator</div>
     <div class="spacer"></div>
+    <div id="modChips" class="mod-chips hidden" title=""></div>
     <div id="presetBtns" class="preset-btns">
       <button data-preset="i3">I3 1.0T</button>
       <button data-preset="i4">I4 2.0</button>
@@ -102,6 +103,9 @@
           <button id="btnNos" class="nos-btn">🚀 NOS (HOLD)</button>
           <button id="btnRefuel" class="refuel-btn">⛽ REFUEL</button>
         </div>
+        <div class="row">
+          <button id="btnMods" class="mods-btn">🔧 MOD SHOP — install upgrades</button>
+        </div>
         <div class="row checks">
           <label><input id="chkLimiter" type="checkbox" checked /> Rev limiter</label>
           <label><input id="chkSound" type="checkbox" checked /> Sound</label>
@@ -127,11 +131,29 @@
     <span><kbd>E</kbd>/<kbd>Q</kbd> gears</span>
     <span><kbd>N</kbd> nitrous</span>
     <span><kbd>F</kbd> refuel</span>
+    <span><kbd>T</kbd> mod shop</span>
     <span><kbd>L</kbd> limiter</span>
     <span><kbd>M</kbd> mute</span>
     <span><kbd>R</kbd> rebuild</span>
     <span class="warn-note">⚠ abuse = heat · no fuel = stall · over-rev = seizure</span>
   </footer>
+
+  <!-- persistent audio-unlock pill (iOS keeps the context suspended until
+       resume() is called inside a fresh touch gesture) -->
+  <button id="audioPill">🔈 TAP FOR SOUND</button>
+
+  <!-- mod shop -->
+  <div id="modShop" class="modal hidden">
+    <div class="modal-card">
+      <h2>🔧 MOD SHOP <small id="modFor"></small></h2>
+      <p class="dim small">Pick any upgrades — they stack. Installing rebuilds the engine cold (fuel &amp; nos refilled).</p>
+      <div id="modGrid" class="mod-grid"></div>
+      <div class="modal-actions">
+        <button id="btnApplyMods" class="apply">🔩 INSTALL &amp; REBUILD</button>
+        <button id="btnCloseMods">CANCEL</button>
+      </div>
+    </div>
+  </div>
 
   <script type="module" src="js/main.js"></script>
 </body>

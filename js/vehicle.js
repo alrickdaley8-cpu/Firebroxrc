@@ -24,6 +24,8 @@ export class Vehicle {
   constructor(cfg) {
     this.mass = cfg.mass;
     this.cdA = cfg.cdA;
+    this.mu = cfg.mu ?? MU;        // tire grip (mods: drag slicks)
+    this.finalR = cfg.finalR ?? FINAL;  // final drive ratio (mods: 4.7 gear)
     this.v = 0;                  // m/s
     this.gear = 0;               // 0 = N, 1..5
     this.shiftT = 0;             // >0 while clutch is open mid-shift
@@ -48,7 +50,7 @@ export class Vehicle {
   // crank rpm corresponding to current wheel speed in current gear
   lockRpm() {
     if (this.gear === 0) return 0;
-    const r = RATIOS[this.gear - 1] * FINAL;
+    const r = RATIOS[this.gear - 1] * this.finalR;
     return (this.v / WHEEL_R) * r * 60 / (2 * Math.PI);
   }
 
@@ -82,7 +84,7 @@ export class Vehicle {
       // launch/crawl clutch slip (any gear): engine free, loaded so revs hold mid-range
       const k = this.v / SLIP_V;
       const slipK = 0.55 + 0.45 * k;
-      const ratioN = RATIOS[this.gear - 1] * FINAL;
+      const ratioN = RATIOS[this.gear - 1] * this.finalR;
       const loadNm = slipK * ((this.resistForce() * WHEEL_R) / ratioN + 20 + 55 * engine.loadFactor);
       return { externalRpm: null, driveLoad: loadNm };
     }
@@ -93,7 +95,7 @@ export class Vehicle {
   step(dt, engine) {
     if (this.shiftT > 0) this.shiftT -= dt;
 
-    const ratio = this.gear > 0 ? RATIOS[this.gear - 1] * FINAL : 0;
+    const ratio = this.gear > 0 ? RATIOS[this.gear - 1] * this.finalR : 0;
     let fEng = 0;
 
     this.wheelspin = 0;
@@ -111,7 +113,7 @@ export class Vehicle {
       }
       // traction limit: excess torque spins the tires (still puts 25% down)
       if (fEng > 0) {
-        const cap = this.mass * G * MU * DRIVEFRAC;
+        const cap = this.mass * G * this.mu * DRIVEFRAC;
         if (fEng > cap) {
           this.wheelspin = Math.min(1, (fEng - cap) / cap);
           fEng = cap + (fEng - cap) * 0.25;
@@ -120,7 +122,7 @@ export class Vehicle {
     } else if (this.gear > 0 && this.shiftT <= 0 && this.v >= SLIP_V) {
       // dead or cut engine turned by the wheels: pumping drag (engine braking)
       if (engine.seized) {
-        fEng = -this.mass * G * MU;      // locked internals = locked wheels
+        fEng = -this.mass * G * this.mu;      // locked internals = locked wheels
       } else if (engine.stalled || !engine.combustionTarget()) {
         const fr = engine.frictionTorque ? engine.frictionTorque(engine.rpm) : 12;
         fEng = -(fr * ratio * EFF) / WHEEL_R * 0.7;

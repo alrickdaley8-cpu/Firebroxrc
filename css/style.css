@@ -197,6 +197,76 @@ aside { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .timers b { color: var(--acc); font-family: Consolas, monospace; font-size: 11px; }
 .timers .pb { font-style: normal; font-size: 9px; color: #b08cff; opacity: 0.9; }
 
+/* ---------- audio unlock pill ---------- */
+#audioPill {
+  position: fixed; right: 14px; bottom: 14px; z-index: 60;
+  background: linear-gradient(180deg, #24314e, #151d31);
+  border: 1px solid var(--cyan); color: var(--txt);
+  border-radius: 999px; padding: 10px 16px; font-size: 13px; font-weight: 700;
+  cursor: pointer; box-shadow: 0 0 18px rgba(57,192,255,0.35);
+  animation: pillPulse 1.6s ease-in-out infinite;
+}
+#audioPill.hidden { display: none; }
+@keyframes pillPulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(57,192,255,0.25); }
+  50% { box-shadow: 0 0 26px rgba(57,192,255,0.6); }
+}
+
+/* ---------- mod chips (header) ---------- */
+.mod-chips { font-size: 15px; letter-spacing: 1px; white-space: nowrap; }
+
+/* ---------- mod shop button ---------- */
+.mods-btn {
+  width: 100%; padding: 10px; font-weight: 700; font-size: 13px;
+  background: linear-gradient(180deg, #3a2f5c, #241d3c); color: #d9c8ff;
+  border: 1px solid #6d5aa8; border-radius: 8px; cursor: pointer;
+}
+.mods-btn:active { transform: translateY(1px); }
+
+/* ---------- mod shop modal ---------- */
+.modal {
+  position: fixed; inset: 0; z-index: 80;
+  background: rgba(5, 8, 14, 0.72);
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(3px);
+}
+.modal.hidden { display: none; }
+.modal-card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  width: min(560px, 94vw); max-height: 86vh; overflow-y: auto;
+  padding: 18px 18px 14px; box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+}
+.modal-card h2 { font-size: 18px; margin-bottom: 4px; }
+.modal-card h2 small { color: var(--dim); font-size: 11px; margin-left: 8px; }
+.small { font-size: 11px; }
+.mod-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0;
+}
+.mod-item {
+  display: flex; gap: 8px; align-items: flex-start; text-align: left;
+  background: var(--panel2); border: 1px solid var(--line); border-radius: 10px;
+  padding: 9px 10px; cursor: pointer; color: var(--txt); font: inherit;
+}
+.mod-item .mi { font-size: 20px; line-height: 1; }
+.mod-item .mn { font-size: 12px; font-weight: 700; display: block; }
+.mod-item .md { font-size: 10px; color: var(--dim); }
+.mod-item.sel {
+  border-color: #b08cff; background: linear-gradient(180deg, #2c2450, #1b1737);
+  box-shadow: 0 0 12px rgba(176,140,255,0.35);
+}
+.mod-item.sel::after { content: "✔"; margin-left: auto; color: #b08cff; font-weight: 800; }
+.modal-actions { display: flex; gap: 8px; }
+.modal-actions .apply {
+  flex: 1; padding: 11px; font-weight: 800; font-size: 13px;
+  background: linear-gradient(180deg, #b08cff, #7b4ff0); color: #fff;
+  border: none; border-radius: 8px; cursor: pointer;
+}
+.modal-actions button:not(.apply) {
+  padding: 11px 16px; background: var(--panel2); color: var(--txt);
+  border: 1px solid var(--line); border-radius: 8px; cursor: pointer;
+}
+@media (max-width: 640px) { .mod-grid { grid-template-columns: 1fr; } }
+
 .bars { display: flex; flex-direction: column; gap: 3px; }
 .bar {
   height: 7px; border-radius: 4px; background: #0c1018;

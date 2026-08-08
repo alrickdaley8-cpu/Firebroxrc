@@ -7,6 +7,7 @@ import { Vehicle } from './vehicle.js';
 import { EngineAudio } from './audio.js';
 import { makeLayout, makeCutawayState, renderCutaway, drawTach, drawDyno, CW, CH } from './render.js';
 import { initUI } from './ui.js';
+import { buildPreset, MOD_BY_ID } from './mods.js';
 
 const $ = id => document.getElementById(id);
 
@@ -16,6 +17,19 @@ let PB = {};
 try { PB = JSON.parse(localStorage.getItem(PB_KEY) || '{}') || {}; } catch (_) { PB = {}; }
 function savePB() { try { localStorage.setItem(PB_KEY, JSON.stringify(PB)); } catch (_) { /* private mode */ } }
 function pbFor(id) { return PB[id] || (PB[id] = {}); }
+
+// ---------- installed mods (persisted per preset in localStorage) ----------
+const MODS_KEY = 'firebrox.mods.v1';
+let modsStore = {};
+try { modsStore = JSON.parse(localStorage.getItem(MODS_KEY) || '{}') || {}; } catch (_) { modsStore = {}; }
+function saveMods() { try { localStorage.setItem(MODS_KEY, JSON.stringify(modsStore)); } catch (_) { /* private mode */ } }
+function moddedCfg(id) { return buildPreset(PRESETS[id], modsStore[id] || []); }
+function newRig(id) {
+  const cfg = moddedCfg(id);
+  return { cfg, engine: new Engine(cfg), vehicle: new Vehicle(cfg) };
+}
+
+const rig0 = newRig('i4');
 
 // ---------- canvas helpers ----------
 function resizeOnce(cv, w, h) {
@@ -40,14 +54,15 @@ function fitFluid(cv, lw, lh) {
 
 // ---------- app state ----------
 const app = {
-  engine: new Engine(PRESETS.i4),
-  vehicle: new Vehicle(PRESETS.i4),
+  engine: rig0.engine,
+  vehicle: rig0.vehicle,
   audio: new EngineAudio(),
   mode: 'dyno',                                   // 'dyno' | 'drive'
   presetId: 'i4',
   controls: { throttle: 0, load: 0.12, limiterOn: true, showLabels: true, nos: false },
   cutaway: makeCutawayState(),
   layout: makeLayout(PRESETS.i4.cylinders),
+  modOfKey: null,
   trail: [],
   peak: { tq: 0, kw: 0 },
   thrSm: 0,
@@ -64,21 +79,42 @@ const app = {
 
   setPreset(id) {
     const p = PRESETS[id];
-    if (!p || p === this.engine.cfg) return;
+    if (!p || (p === this.engine.cfg && !(modsStore[id] || []).length)) return;
     this.presetId = id;
+    this.rebuildEngine(`ENGINE SWAPPED: ${p.name}${(modsStore[id] || []).length ? ' (modded)' : ''}`);
+  },
+
+  // swap engine+vehicle for current preset (with its installed mods).
+  // Used by setPreset, applyMods, and ignition-off swaps.
+  rebuildEngine(flashMsg) {
+    const rig = newRig(this.presetId);
     this.flags = {};
-    this.engine = new Engine(p);
-    this.vehicle = new Vehicle(p);
-    this.layout = makeLayout(p.cylinders);
+    this.engine = rig.engine;
+    this.vehicle = rig.vehicle;
+    this.layout = makeLayout(rig.cfg.cylinders);
     this.cutaway = makeCutawayState();
     this.trail.length = 0;
     this.peak = { tq: 0, kw: 0 };
     this.setIgn(false);
     document.querySelectorAll('#presetBtns button').forEach(b =>
-      b.classList.toggle('active', b.dataset.preset === id));
-    $('engineName').textContent = p.name;
-    this.setFlash(`ENGINE SWAPPED: ${p.name}`);
+      b.classList.toggle('active', b.dataset.preset === this.presetId));
+    const modIds = modsStore[this.presetId] || [];
+    $('engineName').textContent = PRESETS[this.presetId].name +
+      (modIds.length ? ` +${modIds.length} mods` : '');
+    if (flashMsg) this.setFlash(flashMsg);
   },
+
+  // Mod Shop: install a set of upgrade ids on the current preset
+  applyMods(ids) {
+    modsStore[this.presetId] = [...ids];
+    saveMods();
+    const n = ids.length;
+    this.rebuildEngine(n
+      ? `🔧 MOD SHOP: ${n} upgrade${n > 1 ? 's' : ''} installed — engine rebuilt`
+      : '🔧 MOD SHOP: back to stock — engine rebuilt');
+  },
+
+  getModIds() { return new Set(modsStore[this.presetId] || []); },
 
   setMode(m) {
     if (this.mode === m) return;
@@ -95,8 +131,11 @@ const app = {
 
 initUI(app);
 
+app.audio.onState = () => { if (app.refreshAudioPill) app.refreshAudioPill(); };
+
 document.querySelector('#presetBtns button[data-preset="i4"]').classList.add('active');
-$('engineName').textContent = PRESETS.i4.name;
+$('engineName').textContent = PRESETS.i4.name +
+  ((modsStore.i4 || []).length ? ` +${modsStore.i4.length} mods` : '');
 
 // ---------- stat DOM refs ----------
 const st = {
@@ -106,6 +145,7 @@ const st = {
   fuelBar: $('fuelBarFill'), fuelL: $('stFuelL'), nosBar: $('nosBarFill'),
   t0100: $('stT0100'), quarter: $('stQuarter'), dist: $('stDist'),
   top: $('stTop'), pb0100: $('pb0100'), pbQuarter: $('pbQuarter'), pbTop: $('pbTop'),
+  modChips: $('modChips'),
   rebuild: $('btnRebuild'), hint: $('overlayHint'), flashEl: $('flashMsg'),
 };
 
@@ -268,7 +308,17 @@ function loop(now) {
   st.fuelBar.style.width = (en.fuel / en.tankSize * 100).toFixed(1) + '%';
   st.fuelBar.style.background = en.fuel < 1.2 ? '#ff5040' : '';
   st.fuelL.textContent = en.fuel.toFixed(2) + ' L';
-  st.nosBar.style.width = en.nitro.toFixed(0) + '%';
+  st.nosBar.style.width = clamp(en.nitro / en.nosMax, 0, 100).toFixed(0) + '%';
+
+  // mod chips (updated only when the installed set changes)
+  const modKey = app.presetId + '|' + (modsStore[app.presetId] || []).join(',');
+  if (app.modOfKey !== modKey) {
+    app.modOfKey = modKey;
+    const names = (modsStore[app.presetId] || []).map(id => MOD_BY_ID[id]).filter(Boolean);
+    st.modChips.textContent = names.length ? names.map(m => m.icon).join(' ') : '';
+    st.modChips.title = names.length ? names.map(m => m.name).join(' + ') : 'No upgrades installed';
+    st.modChips.classList.toggle('hidden', !names.length);
+  }
 
   st.t0100.textContent = veh.best0100 != null ? veh.best0100.toFixed(2) + ' s' : '—';
   st.quarter.textContent = veh.bestQuarter != null

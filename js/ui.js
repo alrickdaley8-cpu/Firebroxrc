@@ -2,6 +2,9 @@
 // ui.js — DOM control bindings (sliders, buttons, keyboard)
 // ============================================================
 
+import { PRESETS } from './engine.js';
+import { modsFor } from './mods.js';
+
 export function initUI(app) {
   const $ = id => document.getElementById(id);
   const syncFill = el => el.style.setProperty('--fill', el.value + '%');
@@ -150,6 +153,10 @@ export function initUI(app) {
       case 'Digit1': app.setPreset('i3'); break;
       case 'Digit2': app.setPreset('i4'); break;
       case 'Digit3': app.setPreset('i6'); break;
+      case 'KeyT':
+        if ($('modShop').classList.contains('hidden')) openModShop();
+        else $('modShop').classList.add('hidden');
+        break;
       case 'KeyM': {
         const chk = $('chkSound'); chk.checked = !chk.checked;
         chk.dispatchEvent(new Event('change')); break;
@@ -169,5 +176,60 @@ export function initUI(app) {
   });
 
   // one-time audio unlock
-  window.addEventListener('pointerdown', () => app.audio.init(), { once: true });
+  // audio unlock: EVERY gesture retries resume() (iOS gesture expiry fix) —
+  // init() is idempotent and only resumes when suspended
+  window.addEventListener('pointerdown', () => app.audio.init());
+  window.addEventListener('touchend', () => app.audio.init());
+
+  // ---------- audio unlock pill (persistent until sound is confirmed live) ----------
+  const audioPill = $('audioPill');
+  app.refreshAudioPill = () => {
+    const c = app.audio.ctx;
+    const running = c && c.state === 'running';
+    audioPill.classList.toggle('hidden', !!running);
+    audioPill.textContent = c && c.state === 'suspended' ? '🔇 TAP TO UNLOCK SOUND' : '🔈 TAP FOR SOUND';
+  };
+  const unlockAudio = async () => {
+    await app.audio.init();
+    app.refreshAudioPill();
+    const c = app.audio.ctx;
+    if (c && c.state === 'running') app.setFlash('🔊 SOUND UNLOCKED', 2.2);
+  };
+  audioPill.addEventListener('pointerdown', e => { e.preventDefault(); unlockAudio(); });
+  audioPill.addEventListener('click', unlockAudio);
+  app.refreshAudioPill();
+
+  // ---------- MOD SHOP ----------
+  const modShop = $('modShop'), modGrid = $('modGrid'), modFor = $('modFor');
+  const selected = new Set();
+
+  const openModShop = () => {
+    const base = PRESETS[app.presetId];
+    selected.clear();
+    for (const id of app.getModIds()) selected.add(id);
+    modFor.textContent = `— ${base.name}`;
+
+    modGrid.innerHTML = '';
+    for (const m of modsFor(base)) {
+      const b = document.createElement('button');
+      b.className = 'mod-item' + (selected.has(m.id) ? ' sel' : '');
+      b.innerHTML = `<span class="mi">${m.icon}</span><span><span class="mn">${m.name}</span><span class="md">${m.desc}</span></span>`;
+      b.addEventListener('click', () => {
+        app.audio.init();
+        if (selected.has(m.id)) { selected.delete(m.id); b.classList.remove('sel'); }
+        else { selected.add(m.id); b.classList.add('sel'); }
+      });
+      modGrid.appendChild(b);
+    }
+    modShop.classList.remove('hidden');
+  };
+  const closeModShop = () => modShop.classList.add('hidden');
+
+  $('btnMods').addEventListener('click', () => { app.audio.init(); openModShop(); });
+  $('btnCloseMods').addEventListener('click', closeModShop);
+  $('btnApplyMods').addEventListener('click', () => {
+    app.applyMods([...selected]);
+    closeModShop();
+  });
+  modShop.addEventListener('click', e => { if (e.target === modShop) closeModShop(); });
 }

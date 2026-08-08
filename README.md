@@ -42,6 +42,27 @@ genuine wheel-spin, performance timers for 0–100 km/h and the ¼-mile, and sta
 you lug it below idle in a high gear. Shift early and it bogs; shift at the right
 time and it flies.
 
+## 🔧 Mod Shop (press T or the button)
+
+Install **any combination of upgrades** — they stack, and persist per engine:
+
+| Mod | Effect |
+|---|---|
+| 🌬️ Cold-air intake | +7% torque |
+| 💨 Free-flow exhaust | +5% torque, +200 redline |
+| 🧠 Stage-1 ECU tune | +4% torque, +600 redline |
+| 📏 Big-bore kit | +15% torque |
+| 🌀 Turbo kit *(NA engines)* | adds 0.9 bar forced induction — whistle, BOV, surge |
+| 🌀 Bigger turbo *(turbo engines)* | +10% flow, +0.6 bar, more lag |
+| 🚀 Big-shot NOS | +75% spray (was 45%), 2.4× bottle |
+| ❄️ Upgraded radiator | 2× cooling — limp arrives much later |
+| ⚙️ Lightened flywheel | −30% inertia — revs faster both ways |
+| 🛞 Drag slicks | sticky launch, far less wheelspin |
+| 🔀 Short final drive 4.7 | +18% wheel torque, lower top speed |
+| 🪶 Stripped interior | −300 kg |
+
+All-in I-4 build: ~357 kW, **4.7 s 0–100, 12.4 s ¼-mile @ 217 km/h**.
+
 ## Simulation features
 
 - **Crank dynamics** — flywheel inertia, per-cylinder torque ripple at true firing
@@ -61,9 +82,11 @@ time and it flies.
 - **Records & milestones** — personal bests per engine persist between sessions
   (0–100, ¼-mile, top speed), plus toast callouts for full boost, burnouts,
   overheating, low fuel, 100/200 km/h.
-- **Bulletproof audio unlock** — the worklet param map is generated from the node
-  itself (a missing param can never silently kill the whole mix again), every
-  write is guarded, and a 🔊 toast confirms the moment engine audio goes live.
+- **Bulletproof audio unlock (incl. iOS)** — `resume()` is requested synchronously
+  inside every touch/pointer gesture, a silent blip wakes the hardware, the worklet
+  param map is generated from the node itself (a missing param can never kill the
+  mix again), every write is guarded, and a pulsing **"TAP FOR SOUND" pill** stays
+  on screen until the AudioContext is confirmed running.
 - **Synthesized audio** — AudioWorklet pulse train timed from real firing angles,
   filtered noise, sub-rumble, exhaust drone at the firing frequency, starter whine,
   limiter sputter, overrun crackle with occasional **full backfire BANGs**, turbo
@@ -91,6 +114,7 @@ time and it flies.
 | `E` / `Q` | gear up / down (drive mode) |
 | `N` (hold) | nitrous |
 | `F` | refuel |
+| `T` | mod shop |
 | `L` | toggle rev limiter |
 | `M` | mute |
 | `R` | rebuild (when seized) |

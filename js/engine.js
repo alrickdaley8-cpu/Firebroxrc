@@ -106,12 +106,13 @@ export class Engine {
     this.boost = 0;              // bar gauge
     this.bovPulse = false;       // one-shot flag (main clears)
     this.flutterPulse = false;   // one-shot flag (main clears)
-    this.fuel = 8.0;             // liters (tank)
-    this.tankSize = 8.0;
+    this.fuel = this.cfg.tankSize ?? 8.0;    // liters (tank)
+    this.tankSize = this.cfg.tankSize ?? 8.0;
     this.coolant = 18;           // °C
     this.limp = false;           // overheating power cut
     this.steam = false;          // visual flag
-    this.nitro = 100;            // nitrous bottle charge %
+    this.nosMax = this.cfg.nosMax ?? 1.0;    // bottle charges (1 = stock)
+    this.nitro = 100 * this.nosMax;   // nitrous bottle charge %
     this.nosActive = false;
     this._prevThr = 0;
     this.idleI = 0;              // idle-speed integrator (load droop compensation)
@@ -276,7 +277,7 @@ export class Engine {
         if (this.coolant < 45) meanT *= 0.97;
         // nitrous
         this.nosActive = !!(controls.nos && this.nitro > 0 && this.running && thr > 0.3 && !this.limp);
-        if (this.nosActive) meanT *= 1.45;
+        if (this.nosActive) meanT *= 1 + (c.nosBoostFrac ?? 0.45);
 
         const mix = clamp(0.15 + rpm / 2200, 0.15, 0.9);
         // ripple is mean-preserving: fluctuates ±85%·(1−mix) about the mean
@@ -368,7 +369,7 @@ export class Engine {
     // --- cooling system (thermostat fan kicks in at 88°C) ---
     // heat in ~ fuel throughput (rpm x cylinder charge); radiator sheds to ambient
     const heatIn = 58 + (this.rpm / c.redline) * this.loadFactor * 62 + (this.nosActive ? 12 : 0);
-    const rad = this.coolant > 88 ? (this.coolant - 88) * 1.6 : 0;
+    const rad = this.coolant > 88 ? (this.coolant - 88) * (c.radK ?? 1.6) : 0;
     const kTherm = this.coolant < 70 ? 0.02 : 0.011;
     this.coolant += (heatIn - 24 - rad) * kTherm * dt;
     if (this.coolant < 18) this.coolant = 18;

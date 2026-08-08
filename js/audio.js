@@ -13,18 +13,42 @@ export class EngineAudio {
     this.fb = null;
   }
 
-  // Must be called from a user gesture.
+  // Must be called from a user gesture. Safe to call repeatedly — it retries
+  // resume() every time (iOS keeps the context suspended until resume() is
+  // invoked *synchronously inside a touch gesture*).
   async init() {
-    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    if (this.ctx) {
+      if (this.ctx.state !== 'running') {
+        this.ctx.resume();                       // still inside a gesture here
+        this._resumeAttempts = (this._resumeAttempts || 0) + 1;
+      }
+      return;
+    }
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     this.ctx = new AC();
+    // iOS: request resume IMMEDIATELY in the gesture, before any await —
+    // awaiting addModule() first would let the gesture expire and leave the
+    // context suspended forever (the classic "no sound on iOS" bug).
+    this.ctx.resume();
+    // hardware unlock: a 1-sample blip forces silent-mode audio awake
+    try {
+      const blip = this.ctx.createBuffer(1, 1, 22050);
+      const src = this.ctx.createBufferSource();
+      src.buffer = blip;
+      src.connect(this.ctx.destination);
+      src.start(0);
+    } catch (_) { /* non-fatal */ }
+
     const comp = this.ctx.createDynamicsCompressor();
     comp.threshold.value = -18; comp.ratio.value = 6;
     const masterGain = this.ctx.createGain();
     masterGain.gain.value = 0.9;
     masterGain.connect(comp); comp.connect(this.ctx.destination);
     this.masterGain = masterGain;
+
+    this.ctx.onstatechange = () => { if (this.onState) this.onState(this.ctx.state); };
+    if (this.onState) this.onState(this.ctx.state);
 
     try {
       await this.ctx.audioWorklet.addModule('js/worklet.js');
@@ -38,10 +62,12 @@ export class EngineAudio {
       this.params = {};
       for (const [name, p] of this.node.parameters) this.params[name] = p;
       this.ready = true;
+      this.ctx.resume();   // gesture may still be live; harmless if running
       this._announceUnlock();
     } catch (err) {
       console.warn('AudioWorklet unavailable, using fallback synth', err);
       this.initFallback();
+      this.ctx.resume();
       this._announceUnlock();
     }
   }
