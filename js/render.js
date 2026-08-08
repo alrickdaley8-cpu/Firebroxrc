@@ -80,14 +80,35 @@ export function renderCutaway(c, lay, eng, st, view, now, dt) {
 
   c.clearRect(0, 0, CW, CH);
 
-  // ---- backdrop ----
-  const bg = c.createRadialGradient(CW / 2, 260, 80, CW / 2, 300, 720);
-  bg.addColorStop(0, '#171d2b');
-  bg.addColorStop(1, '#0a0d14');
+  // ---- backdrop: studio scene (vertical gradient + spotlight + floor) ----
+  const bg = c.createLinearGradient(0, 0, 0, CH);
+  bg.addColorStop(0, '#111521');
+  bg.addColorStop(0.45, '#0b0e15');
+  bg.addColorStop(1, '#07090e');
   c.fillStyle = bg; c.fillRect(0, 0, CW, CH);
-  c.strokeStyle = 'rgba(120,160,255,0.05)'; c.lineWidth = 1;
-  for (let gx = 0; gx < CW; gx += 49) { c.beginPath(); c.moveTo(gx, 0); c.lineTo(gx, CH); c.stroke(); }
-  for (let gy = 0; gy < CH; gy += 49) { c.beginPath(); c.moveTo(0, gy); c.lineTo(CW, gy); c.stroke(); }
+  // soft spotlight pooling on the engine
+  const spot = c.createRadialGradient(CW / 2, 230, 60, CW / 2, 250, 580);
+  spot.addColorStop(0, 'rgba(84,124,205,0.16)');
+  spot.addColorStop(0.6, 'rgba(60,90,160,0.05)');
+  spot.addColorStop(1, 'rgba(60,90,160,0)');
+  c.fillStyle = spot; c.fillRect(0, 0, CW, CH);
+  // polished shop floor + horizon
+  const floor = c.createLinearGradient(0, 536, 0, CH);
+  floor.addColorStop(0, '#161b28');
+  floor.addColorStop(0.12, '#121724');
+  floor.addColorStop(1, '#090b10');
+  c.fillStyle = floor; c.fillRect(0, 536, CW, CH - 536);
+  c.strokeStyle = 'rgba(140,180,255,0.06)'; c.lineWidth = 1;
+  c.beginPath(); c.moveTo(0, 537); c.lineTo(CW, 537); c.stroke();
+  // engine glow reflecting off the floor
+  const refl = c.createRadialGradient(CW / 2, 560, 30, CW / 2, 560, 330);
+  refl.addColorStop(0, 'rgba(90,140,255,0.08)');
+  refl.addColorStop(1, 'rgba(90,140,255,0)');
+  c.fillStyle = refl; c.fillRect(0, 536, CW, CH - 536);
+  // faint blueprint grid on the back wall
+  c.strokeStyle = 'rgba(120,160,255,0.035)'; c.lineWidth = 1;
+  for (let gx = 0; gx < CW; gx += 49) { c.beginPath(); c.moveTo(gx, 0); c.lineTo(gx, 537); c.stroke(); }
+  for (let gy = 0; gy < 537; gy += 49) { c.beginPath(); c.moveTo(0, gy); c.lineTo(CW, gy); c.stroke(); }
 
   // ---- engine shake (torque reaction at low rpm / cranking / events) ----
   const shakeAmp = clamp(2.2 - eng.rpm / 1400, 0, 1) * clamp(eng.shake * 0.004, 0, 2.2)
@@ -103,14 +124,23 @@ export function renderCutaway(c, lay, eng, st, view, now, dt) {
   c.save();
   c.translate(shX, shY);
 
-  // ---- ground shadow + stand ----
-  c.fillStyle = 'rgba(0,0,0,0.45)';
-  c.beginPath(); c.ellipse(CW / 2, 592, 300, 16, 0, 0, TWO_PI); c.fill();
-  c.fillStyle = '#232a3a';
+  // ---- ground shadow + stand (deep contact shadow + cool stand struts) ----
+  c.fillStyle = 'rgba(0,0,0,0.55)';
+  c.beginPath(); c.ellipse(CW / 2, 592, 310, 17, 0, 0, TWO_PI); c.fill();
+  c.fillStyle = 'rgba(0,0,0,0.35)';
+  c.beginPath(); c.ellipse(CW / 2, 590, 210, 9, 0, 0, TWO_PI); c.fill();
+  const standG = c.createLinearGradient(0, lay.sump1, 0, lay.sump1 + 40);
+  standG.addColorStop(0, '#2e394d');
+  standG.addColorStop(1, '#1a2130');
+  c.fillStyle = standG;
   c.fillRect(lay.X0 + 40, lay.sump1, 22, 34);
   c.fillRect(lay.X1 - 62, lay.sump1, 22, 34);
-  c.fillStyle = '#1b2230';
+  c.fillStyle = '#161d2b';
   c.fillRect(lay.X0 + 20, lay.sump1 + 30, lay.X1 - lay.X0, 8);
+  // stand rim light
+  c.fillStyle = 'rgba(140,170,220,0.20)';
+  c.fillRect(lay.X0 + 40, lay.sump1, 22, 2);
+  c.fillRect(lay.X1 - 62, lay.sump1, 22, 2);
 
   // =================================================
   // INTAKE PLENUM + THROTTLE BODY (drawn behind head)
@@ -153,12 +183,24 @@ export function renderCutaway(c, lay, eng, st, view, now, dt) {
   // =================================================
   // HEAD + VALVETRAIN per cylinder
   // =================================================
-  // head block body
+  // head block body (aluminum gradient + rim-lit top edge + bevel corners)
   const hg = c.createLinearGradient(0, lay.headTop, 0, lay.deckY);
-  hg.addColorStop(0, '#4a5568'); hg.addColorStop(1, '#333c4c');
+  hg.addColorStop(0, '#6d7d96');
+  hg.addColorStop(0.18, '#596880');
+  hg.addColorStop(0.75, '#3d4657');
+  hg.addColorStop(1, '#2c3443');
   rr(c, lay.X0, lay.headTop, lay.X1 - lay.X0, lay.deckY - lay.headTop, 10);
   c.fillStyle = hg; c.fill();
-  c.strokeStyle = '#12161e'; c.lineWidth = 2; c.stroke();
+  c.strokeStyle = '#0d1119'; c.lineWidth = 2; c.stroke();
+  // rim light along the brightest face
+  c.strokeStyle = 'rgba(180,205,245,0.35)'; c.lineWidth = 1.5;
+  c.beginPath();
+  c.moveTo(lay.X0 + 10, lay.headTop + 3);
+  c.lineTo(lay.X1 - 10, lay.headTop + 3);
+  c.stroke();
+  // machined casting ribs
+  c.fillStyle = 'rgba(255,255,255,0.05)';
+  for (let x = lay.X0 + 26; x < lay.X1 - 20; x += 44) c.fillRect(x, lay.headTop + 10, 4, lay.deckY - lay.headTop - 24);
 
   for (let i = 0; i < n; i++) {
     const cx = lay.cylX[i];
@@ -174,9 +216,27 @@ export function renderCutaway(c, lay, eng, st, view, now, dt) {
     const inL = liftProfile(tc, -30, 245, 9);   // intake valve lift
     const exL = liftProfile(tc, 490, 250, 9);   // exhaust valve lift
 
-    // ---- valves ----
+    // ---- valves (with port glow while lifted) ----
     drawValve(c, cx - 22, lay.deckY - 58, cx - 13, lay.deckY - 6, inL, '#57a7ff');
     drawValve(c, cx + 22, lay.deckY - 58, cx + 13, lay.deckY - 6, exL, '#ff7a59');
+    if (inL > 1.5) {
+      c.save(); c.globalCompositeOperation = 'lighter';
+      const vg = c.createRadialGradient(cx - 13, lay.deckY - 6, 1, cx - 13, lay.deckY - 6, 9 + inL);
+      vg.addColorStop(0, `rgba(90,170,255,${0.035 * inL})`);
+      vg.addColorStop(1, 'rgba(90,170,255,0)');
+      c.fillStyle = vg;
+      c.beginPath(); c.arc(cx - 13, lay.deckY - 6, 9 + inL, 0, TWO_PI); c.fill();
+      c.restore();
+    }
+    if (exL > 1.5) {
+      c.save(); c.globalCompositeOperation = 'lighter';
+      const vg = c.createRadialGradient(cx + 13, lay.deckY - 6, 1, cx + 13, lay.deckY - 6, 9 + exL);
+      vg.addColorStop(0, `rgba(255,125,55,${0.035 * exL})`);
+      vg.addColorStop(1, 'rgba(255,125,55,0)');
+      c.fillStyle = vg;
+      c.beginPath(); c.arc(cx + 13, lay.deckY - 6, 9 + exL, 0, TWO_PI); c.fill();
+      c.restore();
+    }
 
     // ---- cam lobes (spin at half crank speed) ----
     const camAng = th / 2 + eng.pinPhase[i] / 2;
@@ -200,14 +260,22 @@ export function renderCutaway(c, lay, eng, st, view, now, dt) {
   // =================================================
   // BLOCK: webs between bores, cavity, sump, oil
   // =================================================
-  // webs (material between cylinder bores)
-  c.fillStyle = '#3c4553';
+  // webs (material between cylinder bores, steel gradient + bevel sheen)
+  const webG = c.createLinearGradient(0, lay.deckY, 0, lay.cavity0 + 6);
+  webG.addColorStop(0, '#4d586c');
+  webG.addColorStop(0.5, '#3b4455');
+  webG.addColorStop(1, '#262d3a');
+  c.fillStyle = webG;
   const webTop = lay.deckY, webBot = lay.cavity0 + 6;
   // left of first bore
   c.fillRect(lay.X0, webTop, lay.cylX[0] - lay.borePx / 2 - lay.X0, webBot - webTop);
   for (let i = 0; i < n - 1; i++) {
     const a = lay.cylX[i] + lay.borePx / 2, b = lay.cylX[i + 1] - lay.borePx / 2;
     c.fillRect(a, webTop, b - a, webBot - webTop);
+    // bevel highlight on each web
+    c.fillStyle = 'rgba(175,200,240,0.14)';
+    c.fillRect(a, webTop + 2, Math.max(0, b - a), 2.5);
+    c.fillStyle = webG;
   }
   c.fillRect(lay.cylX[n - 1] + lay.borePx / 2, webTop, lay.X1 - (lay.cylX[n - 1] + lay.borePx / 2), webBot - webTop);
   // web bolts
@@ -301,6 +369,12 @@ export function renderCutaway(c, lay, eng, st, view, now, dt) {
     rr(c, px, crownY, pw, lay.pistonH, 5);
     c.fillStyle = pg; c.fill();
     c.strokeStyle = '#39424f'; c.lineWidth = 1.5; c.stroke();
+    // polished crown sheen
+    const sheen = c.createLinearGradient(0, crownY, 0, crownY + 10);
+    sheen.addColorStop(0, 'rgba(255,255,255,0.5)');
+    sheen.addColorStop(1, 'rgba(255,255,255,0)');
+    c.fillStyle = sheen;
+    c.fillRect(px + 1, crownY + 1, pw - 2, 9);
     // ring grooves
     c.fillStyle = '#3a434f';
     c.fillRect(px + 3, crownY + 8, pw - 6, 3);
@@ -345,6 +419,18 @@ export function renderCutaway(c, lay, eng, st, view, now, dt) {
     c.fillRect(fwX + 12, cyC + y + 6, 6, 7);
   }
   bolt(c, fwX - 1, cyC, 9, '#8b96a8');
+  // flywheel motion-blur streaks while revving
+  if (eng.rpm > 1500) {
+    const fb = clamp(eng.rpm / 5000, 0, 1);
+    c.save();
+    c.globalCompositeOperation = 'lighter';
+    c.strokeStyle = `rgba(150,175,220,${0.10 * fb})`;
+    c.lineWidth = 5;
+    const fsa = th * 3;
+    c.beginPath(); c.arc(fwX - 1, cyC, 52, fsa, fsa + 1.7); c.stroke();
+    c.beginPath(); c.arc(fwX - 1, cyC, 52, fsa + 2.6, fsa + 2.6 + 1.2); c.stroke();
+    c.restore();
+  }
   // dyno absorber drum
   const dynX = fwX - 98;
   const dynLoad = view.mode === 'drive' ? eng.loadFactor * 0.7 : view.load;
@@ -378,19 +464,22 @@ export function renderCutaway(c, lay, eng, st, view, now, dt) {
   const headerHot = mixColor('#8a6f57', '#ffb257', egt * 0.9);
 
   c.save();
-  if (egt > 0.45) { c.shadowColor = 'rgba(255,110,30,0.75)'; c.shadowBlur = 22 * egt; }
+  if (egt > 0.45) { c.shadowColor = 'rgba(255,110,30,0.75)'; c.shadowBlur = 26 * egt; }
   c.strokeStyle = headerCol; c.lineWidth = 12; c.lineCap = 'round';
   for (let i = 0; i < n; i++) {
     const cx = lay.cylX[i];
+    // heat shimmer: the whole runner shimmers sideways when cherry hot
+    const shimmer = egt * Math.sin(now / 70 + i * 1.7) * 2.2;
     c.beginPath();
     c.moveTo(cx + 13, lay.deckY - 8);
-    c.quadraticCurveTo(cx + 52, 200, colX, 246 + i * 10);
+    c.quadraticCurveTo(cx + 52 + shimmer, 200 + shimmer * 0.5, colX, 246 + i * 10);
     c.stroke();
   }
   c.strokeStyle = headerHot; c.lineWidth = 3;
   for (let i = 0; i < n; i++) {
     const cx = lay.cylX[i];
-    c.beginPath(); c.moveTo(cx + 13, lay.deckY - 12); c.quadraticCurveTo(cx + 52, 196, colX, 242 + i * 10); c.stroke();
+    const shimmer = egt * Math.sin(now / 70 + i * 1.7) * 2.2;
+    c.beginPath(); c.moveTo(cx + 13, lay.deckY - 12); c.quadraticCurveTo(cx + 52 + shimmer, 196, colX, 242 + i * 10); c.stroke();
   }
   c.restore();
   // collector + tailpipe
@@ -456,7 +545,7 @@ export function renderCutaway(c, lay, eng, st, view, now, dt) {
     }
   }
   // spec strip
-  c.fillStyle = '#5c6b85'; c.font = '11px monospace'; c.textAlign = 'left';
+  c.fillStyle = '#8fa3c2'; c.font = '11px monospace'; c.textAlign = 'left';
   c.fillText(
     `BORE ${cfg.bore}mm  ·  STROKE ${cfg.stroke}mm  ·  ${cfg.disp}  ·  FIRING ${cfg.firingOrder.join('-')}  ·  ${(720 / n) | 0}° SPACING` +
     (cfg.maxBoost ? `  ·  TURBO ${cfg.maxBoost.toFixed(1)} bar` : '  ·  N/A'),
@@ -473,7 +562,8 @@ export function renderCutaway(c, lay, eng, st, view, now, dt) {
     c.fillStyle = '#5c6b85'; c.font = '10px sans-serif';
     c.fillText('GEAR', 32, 42);
     c.fillText('SPEED', 108, 42);
-    const shiftFlash = eng.rpm > cfg.redline * 0.85 && eng.running && view.gear > 0 && view.gear < 5;
+    const maxG = view.maxGear || 5;
+    const shiftFlash = eng.rpm > cfg.redline * 0.85 && eng.running && view.gear > 0 && view.gear < maxG;
     c.fillStyle = shiftFlash && Math.sin(now / 60) > 0 ? '#ff5040' : '#e6edf6';
     c.font = 'bold 34px monospace';
     c.fillText(view.gear === 0 ? 'N' : String(view.gear), 34, 80);
@@ -633,13 +723,45 @@ function drawGas(c, lay, i, tc, cx, crownY, eng, now) {
   const strokeIdx = Math.floor(tc / Math.PI) % 4;
   const within = (tc % Math.PI) / Math.PI;
   const run = eng.running || eng.cranking;
+
+  // POWER STROKE: layered flame — orange tongues climbing off the crown,
+  // blue-white core right after ignition (additive "bloom" look)
+  if (run && strokeIdx === 2) {
+    const gap = lay.deckY - crownY;                 // cylinder space height
+    const heat = Math.max(0, 1 - within * 1.35);    // hot at spark, cools downstroke
+    const wob = Math.sin(now / 48 + i * 13.7) * 3;
+    c.save();
+    c.globalCompositeOperation = 'lighter';
+    // base glow across the gap
+    c.fillStyle = `rgba(255,${130 + 60 * heat | 0},40,${0.10 + 0.20 * heat})`;
+    c.fillRect(cx - lay.borePx / 2, crownY, lay.borePx, gap + 4);
+    c.beginPath(); c.arc(cx, lay.deckY, lay.borePx / 2 + 4, Math.PI, 0); c.fill();
+    // tongues of fire
+    const tLen = Math.min(24 + 34 * within + heat * 22, Math.max(10, gap + 18));
+    for (let k = 0; k < 3; k++) {
+      const fx = cx + (k - 1) * (lay.borePx * 0.24) + wob * (k === 1 ? 0.5 : 1);
+      const fw = (lay.borePx * 0.17) * (1 + 0.35 * heat) * (k === 1 ? 1.35 : 1);
+      const fh = tLen * (0.7 + 0.3 * Math.sin(now / 33 + i * 9 + k * 2.4));
+      c.fillStyle = `rgba(${255 - k * 12},${110 + 40 * heat | 0},${20 + 18 * k},${0.40 * (1 - within * 0.5)})`;
+      flameDrop(c, fx, crownY + 6, fw, fh);
+    }
+    // white-hot core right after the spark
+    if (heat > 0.55) {
+      const core = c.createRadialGradient(cx, lay.deckY - 6, 1, cx, lay.deckY - 6, 30);
+      core.addColorStop(0, `rgba(255,255,255,${0.5 * heat})`);
+      core.addColorStop(0.45, `rgba(255,220,150,${0.3 * heat})`);
+      core.addColorStop(1, 'rgba(255,160,60,0)');
+      c.fillStyle = core;
+      c.beginPath(); c.arc(cx, lay.deckY - 6, 30, 0, TWO_PI); c.fill();
+    }
+    c.restore();
+    return;
+  }
+
   if (run) {
     if (strokeIdx === 0) col = `rgba(90,150,255,${0.10 + 0.20 * within})`;
     else if (strokeIdx === 1) col = `rgba(100,120,190,${0.30 + 0.22 * within})`;
-    else if (strokeIdx === 2) {
-      const heat = Math.max(0, 1 - within * 1.4);
-      col = `rgba(255,${120 + 80 * heat | 0},40,${0.16 + 0.62 * heat})`;
-    } else col = `rgba(150,130,110,${0.20 * (1 - within)})`;
+    else col = `rgba(150,130,110,${0.20 * (1 - within)})`;   // exhaust stroke
   }
   if (!col) return;
   c.fillStyle = col;
@@ -650,6 +772,20 @@ function drawGas(c, lay, i, tc, cx, crownY, eng, now) {
   c.beginPath();
   c.arc(cx, lay.deckY, lay.borePx / 2 + 4, Math.PI, 0);
   c.closePath(); c.fill();
+}
+
+// teardrop flame: pointed tip up, fat base down
+function flameDrop(c, x, yBase, w, h) {
+  const s = w / 2;
+  c.beginPath();
+  c.moveTo(x - s, yBase);
+  c.quadraticCurveTo(x - s * 1.05, yBase - h * 0.55, x - s * 0.28, yBase - h * 0.8);
+  c.quadraticCurveTo(x - s * 0.05, yBase - h * 0.94, x, yBase - h);
+  c.quadraticCurveTo(x + s * 0.05, yBase - h * 0.94, x + s * 0.28, yBase - h * 0.8);
+  c.quadraticCurveTo(x + s * 1.05, yBase - h * 0.55, x + s, yBase);
+  c.quadraticCurveTo(x, yBase + s * 0.7, x - s, yBase);
+  c.closePath();
+  c.fill();
 }
 
 // hex color a → b by t
@@ -739,6 +875,19 @@ function drawTurbo(c, lay, eng, angle, colX) {
       c.beginPath(); c.ellipse(9, 0, 9, 3.4, 0.5, 0, TWO_PI); c.fill();
     }
     c.restore();
+    // motion blur streaks while spinning hard
+    const blur = clamp((eng.rpm / 3000) * (0.35 + (eng.cfg.maxBoost ? eng.boost / eng.cfg.maxBoost : 0)), 0, 1);
+    if (blur > 0.08) {
+      c.save();
+      c.translate(x, y);
+      c.globalCompositeOperation = 'lighter';
+      c.strokeStyle = `rgba(190,215,255,${0.10 * blur})`;
+      c.lineWidth = 7;
+      const sa = angle * 5;
+      c.beginPath(); c.arc(0, 0, 14, sa, sa + 1.9); c.stroke();
+      c.beginPath(); c.arc(0, 0, 14, sa + 2.8, sa + 2.8 + 1.4); c.stroke();
+      c.restore();
+    }
     bolt(c, x, y, 5, '#5a6b8f');
     c.restore();
   };

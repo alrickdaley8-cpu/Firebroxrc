@@ -5,6 +5,7 @@
 import { PRESETS } from './engine.js';
 import { modsFor } from './mods.js';
 import { buildCustom, CYL_OPTIONS, TUNES } from './builder.js';
+import { GEAR_COUNTS, SPREADS, gearboxRatios, gearboxFinalR } from './gears.js';
 
 export function initUI(app) {
   const $ = id => document.getElementById(id);
@@ -222,6 +223,7 @@ export function initUI(app) {
     for (const id of app.getModIds()) selected.add(id);
     modFor.textContent = `— ${base.name}`;
     prefillBuilder();
+    prefillGearbox();
 
     modGrid.innerHTML = '';
     for (const m of modsFor(base)) {
@@ -306,6 +308,63 @@ export function initUI(app) {
     syncBuilder();
   };
   prefillBuilder();
+
+  // ---------- GEARBOX ----------
+  const gearSpec = { count: 5, spread: 'street', finalR: 390 };
+  const gearCountSeg = $('gearCountSeg'), gearSpreadSeg = $('gearSpreadSeg');
+  const rngFinalR = $('rngFinalR'), valFinalR = $('valFinalR'), gearInfo = $('gearInfo');
+
+  GEAR_COUNTS.forEach(n => {
+    const b = document.createElement('button');
+    b.textContent = n; b.dataset.v = n;
+    b.addEventListener('click', () => { app.audio.init(); gearSpec.count = n; syncGearbox(); });
+    gearCountSeg.appendChild(b);
+  });
+  for (const k of Object.keys(SPREADS)) {
+    const b = document.createElement('button');
+    b.textContent = SPREADS[k].label; b.dataset.v = k;
+    b.title = SPREADS[k].blurb;
+    b.addEventListener('click', () => { app.audio.init(); gearSpec.spread = k; syncGearbox(); });
+    gearSpreadSeg.appendChild(b);
+  }
+
+  function syncGearbox() {
+    gearSpec.finalR = +rngFinalR.value;
+    valFinalR.textContent = (gearSpec.finalR / 100).toFixed(2);
+    gearCountSeg.querySelectorAll('button').forEach(b => b.classList.toggle('active', +b.dataset.v === gearSpec.count));
+    gearSpreadSeg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.v === gearSpec.spread));
+    const ratios = gearboxRatios(gearSpec);
+    const finR = gearboxFinalR(gearSpec);
+    // top speed at redline in top gear (uses current engine redline)
+    const rl = app.engine.cfg.redline || 7000;
+    const topKmh = rl * 0.305 * 3.6 / (9.549 * ratios[ratios.length - 1] * finR);
+    const firstKmh = rl * 0.305 * 3.6 / (9.549 * ratios[0] * finR);
+    gearInfo.innerHTML =
+      `<b>${gearSpec.count}-speed ${SPREADS[gearSpec.spread].label.toLowerCase()}</b> — ${ratios.join(' / ')} : ${finR.toFixed(2)} final<br>` +
+      `1st tops out ≈${firstKmh.toFixed(0)} km/h · top gear does ≈${topKmh.toFixed(0)} km/h at redline`;
+  }
+  rngFinalR.addEventListener('input', syncGearbox);
+
+  $('btnApplyGears').addEventListener('click', () => {
+    app.audio.init();
+    app.applyGears({ ...gearSpec, finalR: gearSpec.finalR / 100 });
+    closeModShop();
+  });
+  $('btnStockGears').addEventListener('click', () => {
+    app.audio.init();
+    app.applyGears(null);
+    closeModShop();
+  });
+
+  const prefillGearbox = () => {
+    const gs = app.getGearsSpec();
+    gearSpec.count = gs.count;
+    gearSpec.spread = gs.spread;
+    gearSpec.finalR = Math.round(gs.finalR * 100);
+    rngFinalR.value = gearSpec.finalR;
+    syncGearbox();
+  };
+  prefillGearbox();
 
   // instructions card: tap anywhere on it to dismiss (H brings it back)
   $('overlayHint').addEventListener('pointerdown', () => {

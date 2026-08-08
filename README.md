@@ -81,6 +81,22 @@ stroke, tune (street/sport/race) and turbo or naturally-aspirated:
 Example: 8-cyl 4.7L sport → ~430 N·m, high-rev oversquare screamer; 12-cyl 6.6L
 race → 770+ N·m; 5-cyl 2.4L street turbo → turbo warble in a volvo-voice.
 
+## 🔀 Gearbox Builder (inside Mod Shop)
+
+Fit **4, 5 or 6 speeds** with four ratio spreads — **Economy** (tall overdrive),
+**Street** (stock), **Sport** (short legs), **Close** (racing dogbox, tiny rpm
+drops but more shifts) — plus a **final-drive slider 3.0–5.2**. Live readout
+shows the full stack and top speed in every gear. Persisted per engine.
+
+## Visuals (v3 overhaul)
+
+Studio scene: gradient backdrop with spotlight pooling, polished shop floor with
+engine-glow reflection, rim-lit aluminum head with casting ribs, beveled steel
+webs, polished piston crowns, **layered combustion flames** (orange tongues off
+the crown, blue-white core right after ignition), glowing valve ports, heat-
+shimmering headers, motion-blur streaks on impellers and flywheel, deep contact
+shadows and vignette.
+
 ## Simulation features
 
 - **Crank dynamics** — flywheel inertia, per-cylinder torque ripple at true firing

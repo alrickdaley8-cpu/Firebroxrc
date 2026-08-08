@@ -9,6 +9,7 @@ import { makeLayout, makeCutawayState, renderCutaway, drawTach, drawDyno, CW, CH
 import { initUI } from './ui.js';
 import { buildPreset, MOD_BY_ID } from './mods.js';
 import { buildCustom } from './builder.js';
+import { gearboxRatios, gearboxFinalR, gearboxLabel, DEFAULT_GEARBOX } from './gears.js';
 
 const $ = id => document.getElementById(id);
 
@@ -37,9 +38,23 @@ function baseCfgOf(id) {
   return PRESETS[id] || null;
 }
 
+// ---------- gearbox (persisted per preset in localStorage) ----------
+const GEARS_KEY = 'firebrox.gears.v1';
+let gearsStore = {};
+try { gearsStore = JSON.parse(localStorage.getItem(GEARS_KEY) || '{}') || {}; } catch (_) { gearsStore = {}; }
+function saveGears() { try { localStorage.setItem(GEARS_KEY, JSON.stringify(gearsStore)); } catch (_) { /* private mode */ } }
+
 function moddedCfg(id) {
   const base = baseCfgOf(id);
-  return base ? buildPreset(base, modsStore[id] || []) : null;
+  if (!base) return null;
+  const cfg = buildPreset(base, modsStore[id] || []);
+  // custom gearbox wins over the short-final-drive mod for the final ratio
+  const gs = gearsStore[id];
+  if (gs) {
+    cfg.ratios = gearboxRatios(gs);
+    cfg.finalR = gearboxFinalR(gs);
+  }
+  return cfg;
 }
 function newRig(id) {
   const cfg = moddedCfg(id);
@@ -157,6 +172,21 @@ const app = {
   },
 
   getModIds() { return new Set(modsStore[this.presetId] || []); },
+
+  // Gearbox: install a { count, spread, finalR } spec on the current preset
+  applyGears(spec) {
+    if (!spec) {
+      delete gearsStore[this.presetId];
+      saveGears();
+      this.rebuildEngine('⚙ GEARBOX: back to stock 5-speed street');
+    } else {
+      gearsStore[this.presetId] = { ...spec };
+      saveGears();
+      this.rebuildEngine(`⚙ GEARBOX INSTALLED: ${gearboxLabel(spec)}`);
+    }
+  },
+
+  getGearsSpec() { return gearsStore[this.presetId] ? { ...gearsStore[this.presetId] } : { ...DEFAULT_GEARBOX }; },
 
   setMode(m) {
     if (this.mode === m) return;
@@ -318,6 +348,7 @@ function loop(now) {
     showLabels: app.controls.showLabels,
     mode: app.mode,
     gear: veh.gear,
+    maxGear: veh.ratios.length,
     speedKmh: veh.kmh(),
     shiftPing: veh.shiftT > 0,
     overrun,

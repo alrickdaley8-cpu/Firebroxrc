@@ -152,6 +152,28 @@
       <p class="dim small">Pick any upgrades — they stack. Installing rebuilds the engine cold (fuel &amp; nos refilled).</p>
       <div id="modGrid" class="mod-grid"></div>
 
+      <!-- GEARBOX -->
+      <div class="builder">
+        <h3>🔀 GEARBOX <small>— change the box</small></h3>
+        <div class="build-row">
+          <label>SPEEDS</label>
+          <div id="gearCountSeg" class="seg"></div>
+        </div>
+        <div class="build-row">
+          <label>SPREAD</label>
+          <div id="gearSpreadSeg" class="seg"></div>
+        </div>
+        <div class="build-row">
+          <label>FINAL DRIVE <b id="valFinalR">3.90</b></label>
+          <input id="rngFinalR" type="range" min="300" max="520" value="390" />
+        </div>
+        <div id="gearInfo" class="build-spec">—</div>
+        <div class="modal-actions">
+          <button id="btnApplyGears" class="apply">🔩 FIT THIS GEARBOX</button>
+          <button id="btnStockGears">STOCK BOX</button>
+        </div>
+      </div>
+
       <!-- ENGINE BUILDER -->
       <div class="builder">
         <h3>⚙ ENGINE BUILDER <small>— design any engine</small></h3>

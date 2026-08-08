@@ -26,6 +26,7 @@ export class Vehicle {
     this.cdA = cfg.cdA;
     this.mu = cfg.mu ?? MU;        // tire grip (mods: drag slicks)
     this.finalR = cfg.finalR ?? FINAL;  // final drive ratio (mods: 4.7 gear)
+    this.ratios = cfg.ratios ?? RATIOS; // gear stack (mod shop gearbox builder)
     this.v = 0;                  // m/s
     this.gear = 0;               // 0 = N, 1..5
     this.shiftT = 0;             // >0 while clutch is open mid-shift
@@ -50,13 +51,13 @@ export class Vehicle {
   // crank rpm corresponding to current wheel speed in current gear
   lockRpm() {
     if (this.gear === 0) return 0;
-    const r = RATIOS[this.gear - 1] * this.finalR;
+    const r = this.ratios[this.gear - 1] * this.finalR;
     return (this.v / WHEEL_R) * r * 60 / (2 * Math.PI);
   }
 
   shift(dir) {                   // dir +1 / -1
     if (this.shiftT > 0) return;
-    const g = Math.min(5, Math.max(0, this.gear + dir));
+    const g = Math.min(this.ratios.length, Math.max(0, this.gear + dir));
     if (g === this.gear) return;
     // rev-match blip on downshift while rolling with clutch engaged
     if (dir < 0 && g > 0 && this.v >= SLIP_V) this.blipPing = true;
@@ -84,7 +85,7 @@ export class Vehicle {
       // launch/crawl clutch slip (any gear): engine free, loaded so revs hold mid-range
       const k = this.v / SLIP_V;
       const slipK = 0.55 + 0.45 * k;
-      const ratioN = RATIOS[this.gear - 1] * this.finalR;
+      const ratioN = this.ratios[this.gear - 1] * this.finalR;
       const loadNm = slipK * ((this.resistForce() * WHEEL_R) / ratioN + 20 + 55 * engine.loadFactor);
       return { externalRpm: null, driveLoad: loadNm };
     }
@@ -95,7 +96,7 @@ export class Vehicle {
   step(dt, engine) {
     if (this.shiftT > 0) this.shiftT -= dt;
 
-    const ratio = this.gear > 0 ? RATIOS[this.gear - 1] * this.finalR : 0;
+    const ratio = this.gear > 0 ? this.ratios[this.gear - 1] * this.finalR : 0;
     let fEng = 0;
 
     this.wheelspin = 0;
