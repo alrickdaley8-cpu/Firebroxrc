@@ -41,7 +41,14 @@ export function initUI(app) {
   const setIgn = on => {
     app.audio.init();
     app.engine.ignition = on;
-    if (on) app.engine.stalled = false;
+    if (on) {
+      app.engine.stalled = false;
+      // never show the instructions again once you've used the sim —
+      // hide immediately, don't wait for the next animation frame
+      app.hintDismissed = true;
+      try { localStorage.setItem('firebrox.hintSeen', '1'); } catch (_) { /* private mode */ }
+      $('overlayHint').style.display = 'none';
+    }
     btnIgn.classList.toggle('on', on);
     btnIgn.textContent = on ? 'IGNITION ON' : 'IGNITION OFF';
   };

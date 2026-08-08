@@ -11,7 +11,7 @@ a real cooling system — and consequences for abusing all of them.
 Serve the folder with any static file server and open it in a browser:
 
 ```bash
-python3 -m http.server 8000
+python3 serve.py
 # then visit http://localhost:8000
 ```
 
