@@ -105,6 +105,7 @@ export class Engine {
     // systems
     this.boost = 0;              // bar gauge
     this.bovPulse = false;       // one-shot flag (main clears)
+    this.flutterPulse = false;   // one-shot flag (main clears)
     this.fuel = 8.0;             // liters (tank)
     this.tankSize = 8.0;
     this.coolant = 18;           // °C
@@ -200,10 +201,15 @@ export class Engine {
         : 2.8;
       this.boost += (tgt - this.boost) * Math.min(1, rate * dt);
       this.boost = Math.max(0, this.boost);
-      // BOV: throttle snaps shut under boost
-      if (this._prevThr > 0.45 && thr < 0.1 && this.boost > 0.4) {
-        this.bovPulse = true;
-        this.boost *= 0.35;
+      // lift-off under boost: big boost vents via BOV, moderate boost surges (flutter)
+      if (this._prevThr > 0.45 && thr < 0.1 && this.boost > 0.22) {
+        if (this.boost > 0.5) {
+          this.bovPulse = true;
+          this.boost *= 0.35;
+        } else {
+          this.flutterPulse = true;      // turbo "stu-stu-stu" surge
+          this.boost *= 0.55;
+        }
       }
     }
     this._prevThr = thr;

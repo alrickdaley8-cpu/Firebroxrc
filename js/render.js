@@ -59,7 +59,7 @@ function liftProfile(tc, startDeg, durDeg, mx) {
 
 // ---------- state for particles & flashes ----------
 export function makeCutawayState() {
-  return { particles: [], flashes: [], smokes: [], lastT: 0, turboAngle: 0 };
+  return { particles: [], flashes: [], smokes: [], embers: [], bang: -1e9, lastT: 0, turboAngle: 0 };
 }
 
 const MAXP = 160;
@@ -87,9 +87,13 @@ export function renderCutaway(c, lay, eng, st, view, now, dt) {
   // ---- engine shake (torque reaction at low rpm / cranking / events) ----
   const shakeAmp = clamp(2.2 - eng.rpm / 1400, 0, 1) * clamp(eng.shake * 0.004, 0, 2.2)
     + (eng.cranking ? 0.7 : 0) + (eng.limitCut > 0.5 ? 0.6 : 0)
-    + (view.eventShake || 0) + (eng.nosActive ? 0.5 : 0);
+    + (view.eventShake || 0) + (eng.nosActive ? 0.5 : 0)
+    + (view.wheelspin || 0) * 0.6;                       // car squirms on wheelspin
   const shX = (Math.random() - 0.5) * shakeAmp;
   const shY = (Math.random() - 0.5) * shakeAmp;
+
+  // relative wind over the engine (drive mode, car moving)
+  const windF = view.mode === 'drive' ? clamp(view.speedKmh / 200, 0, 1) : 0;
 
   c.save();
   c.translate(shX, shY);
@@ -400,9 +404,19 @@ export function renderCutaway(c, lay, eng, st, view, now, dt) {
   c.fillStyle = '#9db3c9'; c.fillRect(CW - 34, 458, 34, 24);
   c.fillStyle = '#0c0f16'; c.fillRect(CW - 8, 462, 8, 16);
 
-  // tailpipe flames: overrun crackle / nitrous
+  // overrun BACKFIRE: big tailpipe bang + flying embers
+  if (view.overrun && eng.running && eng.rpm > 3000 && Math.random() < 0.045) {
+    st.bang = now;
+    for (let k = 0; k < 8; k++) {
+      st.embers.push({ x: CW - 4, y: 470, vx: 60 + Math.random() * 240, vy: -50 + Math.random() * 100, life: 0.6 + Math.random() * 0.5 });
+    }
+  }
+  const bangK = clamp(1 - (now - st.bang) / 110, 0, 1);
+
+  // tailpipe flames: overrun crackle / nitrous / backfire burst
   const flamey = (view.overrun && eng.running) || eng.nosActive;
-  if (flamey) drawFlame(c, CW - 2, 470, eng.nosActive, eng.rpm, now);
+  if (flamey || bangK > 0) drawFlame(c, CW - 2, 470, eng.nosActive, eng.rpm, now,
+    bangK + (eng.nosActive ? 0.35 : 0));
 
   // =================================================
   // TURBOCHARGER (turbo presets only)
@@ -467,6 +481,12 @@ export function renderCutaway(c, lay, eng, st, view, now, dt) {
       c.fillStyle = 'rgba(255,210,90,0.9)'; c.font = 'bold 12px sans-serif';
       c.fillText('⇧ SHIFT', 118, 60);
     }
+    // wheelspin indicator
+    if ((view.wheelspin || 0) > 0.15) {
+      c.fillStyle = Math.sin(now / 70) > 0 ? '#ff5040' : '#ffb066';
+      c.font = 'bold 13px sans-serif';
+      c.fillText('SLIP!', 126, 98);
+    }
     c.restore();
   }
 
@@ -485,16 +505,77 @@ export function renderCutaway(c, lay, eng, st, view, now, dt) {
       st.smokes.push({ x: lay.cylX[(Math.random() * n) | 0], y: 300, vy: -0.6 - Math.random(), r: 8, a: 0.5, col: '140,140,150' });
     }
   }
-  // persistent smoke (seizure / steam)
+  // ---- tire smoke: wheelspin boiling rubber (drive mode) ----
+  if (view.mode === 'drive' && (view.wheelspin || 0) > 0.04 && st.smokes.length < 130) {
+    if (Math.random() < 0.5 + view.wheelspin * 0.4) {
+      st.smokes.push({
+        x: lay.X0 - 26 + Math.random() * 34, y: 566 + Math.random() * 14,
+        vx: -(1.2 + view.wheelspin * 4.5 + Math.random() * 2),
+        vy: -0.35 - Math.random() * 0.6,
+        r: 5 + Math.random() * 5, a: 0.24 + 0.42 * view.wheelspin, col: '208,202,198',
+      });
+    }
+  }
+
+  // ---- backfire embers (fiery sparks out of the tailpipe) ----
+  if (st.embers.length) {
+    c.save(); c.globalCompositeOperation = 'lighter';
+    for (let i = st.embers.length - 1; i >= 0; i--) {
+      const e = st.embers[i];
+      e.vy += 320 * dt; e.x += e.vx * dt; e.y += e.vy * dt; e.life -= dt * 1.5;
+      if (e.life <= 0 || e.y > CH - 6) {
+        // tiny ground bounce blink
+        if (e.y > CH - 6 && e.life > 0.15) { e.vy *= -0.4; e.vx *= 0.7; e.y = CH - 6; }
+        else { st.embers.splice(i, 1); continue; }
+      }
+      const gl = clamp(e.life, 0, 1);
+      c.fillStyle = `rgba(255,${150 + 90 * gl | 0},${40 + 30 * gl | 0},${gl})`;
+      c.beginPath(); c.arc(e.x, e.y, 0.8 + 2.4 * gl, 0, TWO_PI); c.fill();
+    }
+    c.restore();
+  }
+
+  // persistent smoke (seizure / steam / tires) — drifts with the wind
   for (let i = st.smokes.length - 1; i >= 0; i--) {
     const s = st.smokes[i];
-    s.y += s.vy; s.r += 0.35; s.a -= 0.004;
-    if (s.a <= 0) { st.smokes.splice(i, 1); continue; }
+    s.y += s.vy;
+    s.x += (s.vx || 0) - windF * 2.2;
+    s.r += 0.35; s.a -= 0.004;
+    if (s.a <= 0 || s.x < -60) { st.smokes.splice(i, 1); continue; }
     c.fillStyle = `rgba(${s.col || '140,140,150'},${s.a})`;
     c.beginPath(); c.arc(s.x, s.y, s.r, 0, TWO_PI); c.fill();
   }
 
   c.restore(); // end shake
+
+  // ---- speed lines (drive mode, high speed) — outside the shake ----
+  if (view.mode === 'drive' && view.speedKmh > 55) {
+    const sp = view.speedKmh;
+    c.save();
+    c.globalAlpha = clamp((sp - 55) / 260 * 0.4, 0, 0.4);
+    c.strokeStyle = '#8fa6d0'; c.lineWidth = 2; c.lineCap = 'round';
+    for (let k = 0; k < 7; k++) {
+      const y = 48 + ((k * 173) % 520);
+      const len = 46 + sp * 1.1;
+      const x = CW - (((now * (0.55 + k * 0.11) * (sp / 90)) + k * 239) % (CW + 360)) + len;
+      c.beginPath(); c.moveTo(x, y); c.lineTo(x + len, y); c.stroke();
+    }
+    c.restore();
+  }
+
+  // ---- backfire screen flash ----
+  if (bangK > 0) {
+    c.save(); c.globalCompositeOperation = 'lighter';
+    c.fillStyle = `rgba(255,140,50,${0.10 * bangK})`;
+    c.fillRect(0, 0, CW, CH);
+    c.restore();
+  }
+
+  // ---- vignette ----
+  const vig = c.createRadialGradient(CW / 2, CH / 2, CH * 0.42, CW / 2, CH / 2, CH * 0.98);
+  vig.addColorStop(0, 'rgba(0,0,0,0)');
+  vig.addColorStop(1, 'rgba(0,0,0,0.32)');
+  c.fillStyle = vig; c.fillRect(0, 0, CW, CH);
 }
 
 // ---------- sub-renderers ----------
@@ -574,10 +655,10 @@ function mixColor(a, b, t) {
   return `rgb(${m[0]},${m[1]},${m[2]})`;
 }
 
-// tailpipe flame burst
-function drawFlame(c, x, y, isNos, rpm, now) {
+// tailpipe flame burst (extra stretches/brightens it during backfires & nitrous)
+function drawFlame(c, x, y, isNos, rpm, now, extra = 0) {
   const flick = 0.75 + Math.random() * 0.5;
-  const len = (10 + rpm / 300) * flick;
+  const len = (10 + rpm / 300) * flick * (1 + extra * 1.5);
   const cols = isNos
     ? ['rgba(120,180,255,0.9)', 'rgba(60,110,255,0.5)', 'rgba(30,60,200,0)']
     : ['rgba(255,240,180,0.95)', 'rgba(255,140,40,0.55)', 'rgba(255,60,10,0)'];
@@ -622,6 +703,16 @@ function drawTurbo(c, lay, eng, angle, colX) {
   c.strokeStyle = '#46587d'; c.lineWidth = 1;
   for (let i = -10; i <= 10; i += 4) { c.beginPath(); c.moveTo(i, -8); c.lineTo(i, 8); c.stroke(); }
   c.restore();
+  // pressurized charge glow inside the pipe (rises with boost)
+  const boostGlow = clamp(eng.boost / (eng.cfg.maxBoost || 1), 0, 1);
+  if (boostGlow > 0.04) {
+    c.save(); c.globalCompositeOperation = 'lighter';
+    c.strokeStyle = `rgba(126,214,255,${0.32 * boostGlow})`; c.lineWidth = 6; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(kx - 8, ky - 20);
+    c.quadraticCurveTo(kx - 60, ky - 60, lay.X1 + 10, lay.plenumY + 20);
+    c.stroke();
+    c.restore();
+  }
 
   // housing (turbine + compressor)
   const spin = (x, y, col1, glow) => {
@@ -706,7 +797,9 @@ function updateParticles(c, lay, eng, st, view, now, dt, tbX, colX) {
       const rr2 = clamp(p.life, 0, 1);
       c.fillStyle = heat > 0.15
         ? `rgba(255,${150 + 60 * heat | 0},60,${0.5 * rr2})`
-        : `rgba(160,158,168,${0.34 * rr2})`;
+        : eng.coolant < 45
+          ? `rgba(205,212,224,${0.42 * rr2})`   // cold-start condensate
+          : `rgba(160,158,168,${0.34 * rr2})`;
       c.beginPath(); c.arc(x, y, p.r, 0, TWO_PI); c.fill();
       if (p.life <= 0 || p.s >= 1) parts.splice(i, 1);
     }
@@ -752,13 +845,18 @@ export function drawTach(c, W, H, eng, rpmSm) {
     }
   }
 
-  // shift light
+  // shift light + redline zone glow pulse
   const near = rpmSm > eng.cfg.redline - 400;
   if (near && eng.running) {
     const blink = Math.sin(performance.now() / 40) > 0;
     if (blink) {
       c.fillStyle = 'rgba(255,60,40,0.9)';
       c.beginPath(); c.arc(cx, cy - R * 0.45, 9, 0, TWO_PI); c.fill();
+      c.save();
+      c.shadowColor = 'rgba(255,60,50,0.9)'; c.shadowBlur = 18;
+      c.strokeStyle = 'rgba(255,80,60,0.55)'; c.lineWidth = 7;
+      c.beginPath(); c.arc(cx, cy, R - 8, angOf(eng.cfg.redline), angOf(maxR)); c.stroke();
+      c.restore();
     }
   }
 

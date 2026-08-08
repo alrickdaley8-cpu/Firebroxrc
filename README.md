@@ -56,9 +56,19 @@ time and it flies.
 - **Failures** — redline abuse seizes the motor (rebuild button); lugging stalls it
   (re-crank); overheating limps it (cool it down).
 - **Synthesized audio** — AudioWorklet pulse train timed from real firing angles,
-  filtered noise, sub-rumble, starter whine, limiter sputter, overrun crackle, turbo
-  whistle + intake whoosh, BOV pssh, gear-shift clunk, nitrous hiss, cold-start
-  lope. Two-oscillator fallback where AudioWorklet is unavailable.
+  filtered noise, sub-rumble, exhaust drone at the firing frequency, starter whine,
+  limiter sputter, overrun crackle with occasional **full backfire BANGs**, turbo
+  whistle + intake whoosh, BOV pssh on high-boost lift-off, **compressor-surge
+  "stu-stu-stu" flutter** on moderate-boost lift-off, gear-shift clunk, nitrous
+  hiss, **tire screech** on wheelspin, cold-start lope. Two-oscillator fallback
+  where AudioWorklet is unavailable.
+- **Visual FX** — EGT-glowing headers, tailpipe flames (blue on nitrous), rolling
+  backfire fireballs with bouncing embers and a screen flash, boiling **tire
+  smoke** + SLIP! warning + tire screech on wheelspin, speed lines at highway
+  pace, wind-blown smoke, steam puffs, boost-lit charge pipe, cold-start
+  condensate, pulsing tach redline, vignette.
+- **Hold-to-use controls** — no long-press callouts/copy menus: starter and NOS
+  buttons are pointer-captured hold buttons, throttle keys ramp while held.
 
 ## Controls
 

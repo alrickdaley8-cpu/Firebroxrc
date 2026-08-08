@@ -44,6 +44,7 @@ const app = {
   peak: { tq: 0, kw: 0 },
   thrSm: 0,
   rpmSm: 0,
+  spinSm: 0,
   eventShake: 0,
   flash: { msg: '', until: 0 },
 
@@ -143,6 +144,7 @@ function loop(now) {
 
   // ---- one-shot events ----
   if (en.bovPulse) { en.bovPulse = false; app.audio.bov(); app.eventShake = Math.max(app.eventShake, 1.0); }
+  if (en.flutterPulse) { en.flutterPulse = false; app.audio.flutter(); app.eventShake = Math.max(app.eventShake, 0.4); }
   if (veh.shiftPing) { veh.shiftPing = false; app.audio.shift(); app.eventShake = Math.max(app.eventShake, 0.7); }
   if (veh.justFinished) {
     if (veh.justFinished === '0100') app.setFlash(`0–100 km/h in ${veh.last0100.toFixed(1)}s 🏁`, 4.5);
@@ -150,6 +152,10 @@ function loop(now) {
     veh.justFinished = null;
   }
   app.eventShake *= Math.exp(-dt * 5);
+
+  // wheelspin level (drive mode only), smoothed for audio + visuals
+  const spinNow = app.mode === 'drive' ? veh.wheelspin : 0;
+  app.spinSm += (spinNow - app.spinSm) * (1 - Math.exp(-dt / 0.08));
 
   // fire events -> flashes
   for (const f of en.drainFires()) app.cutaway.flashes.push(f);
@@ -179,6 +185,7 @@ function loop(now) {
     shiftPing: veh.shiftT > 0,
     overrun,
     eventShake: app.eventShake,
+    wheelspin: app.spinSm,
   };
   const c1 = fitFixed(cvMain, CW, CH);
   renderCutaway(c1, app.layout, en, app.cutaway, view, now, dt);
@@ -251,6 +258,7 @@ function loop(now) {
     boost: en.boost,
     nos: en.nosActive,
     cold: en.coolant < 45,
+    spin: app.spinSm,
   });
 }
 

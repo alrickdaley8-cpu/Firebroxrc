@@ -6,6 +6,21 @@ export function initUI(app) {
   const $ = id => document.getElementById(id);
   const syncFill = el => el.style.setProperty('--fill', el.value + '%');
 
+  // ---------- hold-friendly buttons: no iOS callout/copy menu, no stuck-on holds ----------
+  window.addEventListener('contextmenu', e => e.preventDefault());
+  // capture the pointer on hold-buttons so sliding the finger off still releases cleanly
+  const holdify = (btn, on, off) => {
+    btn.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      try { btn.setPointerCapture(e.pointerId); } catch (_) { /* mouse */ }
+      on();
+    });
+    const end = () => off();
+    btn.addEventListener('pointerup', end);
+    btn.addEventListener('pointercancel', end);
+    btn.addEventListener('lostpointercapture', end);
+  };
+
   // ---------- engine preset buttons ----------
   document.querySelectorAll('#presetBtns button').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -40,9 +55,7 @@ export function initUI(app) {
     }
   };
   const crankOff = () => { app.engine.cranking = false; };
-  btnStarter.addEventListener('pointerdown', crankOn);
-  btnStarter.addEventListener('pointerup', crankOff);
-  btnStarter.addEventListener('pointerleave', crankOff);
+  holdify(btnStarter, crankOn, crankOff);
 
   // ---------- sliders ----------
   const rngT = $('rngThrottle'), valT = $('valThrottle');
@@ -72,9 +85,7 @@ export function initUI(app) {
   const btnNos = $('btnNos');
   const nosOn = () => { app.audio.init(); app.controls.nos = true; btnNos.classList.add('on'); };
   const nosOff = () => { app.controls.nos = false; btnNos.classList.remove('on'); };
-  btnNos.addEventListener('pointerdown', nosOn);
-  btnNos.addEventListener('pointerup', nosOff);
-  btnNos.addEventListener('pointerleave', nosOff);
+  holdify(btnNos, nosOn, nosOff);
   app.nosOff = nosOff;
 
   // ---------- refuel ----------
@@ -111,6 +122,19 @@ export function initUI(app) {
 
   // ---------- keyboard ----------
   window.addEventListener('keydown', e => {
+    // hold-to-ramp throttle keys (key-repeat is exactly what we want here)
+    if (e.code === 'ArrowUp' || e.code === 'KeyW') {
+      app.controls.throttle = Math.min(1, app.controls.throttle + 0.05);
+      app.setThrottleUI(app.controls.throttle);
+      e.preventDefault();
+      return;
+    }
+    if (e.code === 'ArrowDown' || e.code === 'KeyS') {
+      app.controls.throttle = Math.max(0, app.controls.throttle - 0.05);
+      app.setThrottleUI(app.controls.throttle);
+      e.preventDefault();
+      return;
+    }
     if (e.repeat) return;
     switch (e.code) {
       case 'Space':
@@ -118,12 +142,6 @@ export function initUI(app) {
         setIgn(!app.engine.ignition);
         break;
       case 'Enter': crankOn(); break;
-      case 'ArrowUp': case 'KeyW':
-        app.controls.throttle = Math.min(1, app.controls.throttle + 0.05);
-        app.setThrottleUI(app.controls.throttle); break;
-      case 'ArrowDown': case 'KeyS':
-        app.controls.throttle = Math.max(0, app.controls.throttle - 0.05);
-        app.setThrottleUI(app.controls.throttle); break;
       case 'KeyE': if (app.mode === 'drive') app.vehicle.shift(+1); break;
       case 'KeyQ': if (app.mode === 'drive') app.vehicle.shift(-1); break;
       case 'KeyN': nosOn(); break;

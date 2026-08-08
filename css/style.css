@@ -14,6 +14,19 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+/* no long-press callout / copy menu / double-tap zoom anywhere in the app */
+html, body {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+body, button, canvas, .panel, header, footer, .flash, .pill {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+canvas { touch-action: none; }
+
 body {
   background: var(--bg);
   color: var(--txt);

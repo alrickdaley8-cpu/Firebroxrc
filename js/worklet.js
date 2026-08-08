@@ -20,6 +20,7 @@ class ICEAudioProcessor extends AudioWorkletProcessor {
       { name: 'boost',      defaultValue: 0,     minValue: 0,    maxValue: 2 },
       { name: 'nos',        defaultValue: 0,     minValue: 0,    maxValue: 1 },
       { name: 'cold',       defaultValue: 0,     minValue: 0,    maxValue: 1 },
+      { name: 'spin',       defaultValue: 0,     minValue: 0,    maxValue: 1 },
     ];
   }
 
@@ -36,6 +37,12 @@ class ICEAudioProcessor extends AudioWorkletProcessor {
     this.bovEnv = 0;         // blow-off valve envelope
     this.clunkEnv = 0;       // gear shift thud envelope
     this.clunkPh = 0;
+    this.flutEnv = 0;        // compressor surge (flutter) envelope
+    this.flutPh = 0;
+    this.bangEnv = 0;        // big backfire envelope
+    this.bangPh = 0;
+    this.dronePh = 0;        // exhaust drone phase (firing frequency)
+    this.scrPh = 0;          // screech oscillator phase
     this.t = 0;
     this.fireAngles = [0, 180, 360, 540];
     this.port.onmessage = (e) => {
@@ -43,6 +50,7 @@ class ICEAudioProcessor extends AudioWorkletProcessor {
       if (e.data.fireAngles) this.fireAngles = e.data.fireAngles;
       if (e.data.bov) this.bovEnv = 1;
       if (e.data.shift) { this.clunkEnv = 0.9; this.clunkPh = 0; }
+      if (e.data.flutter) this.flutEnv = 1;
     };
   }
 
@@ -55,13 +63,15 @@ class ICEAudioProcessor extends AudioWorkletProcessor {
     const rpmP = params.rpm, loadP = params.load, combP = params.combustion,
       crankP = params.cranking, cutP = params.cut, overP = params.overrun,
       cylP = params.cyls, thrP = params.throaty, mastP = params.master,
-      boostP = params.boost, nosP = params.nos, coldP = params.cold;
+      boostP = params.boost, nosP = params.nos, coldP = params.cold,
+      spinP = params.spin;
 
     for (let i = 0; i < n; i++) {
       const g = (p, dflt) => (p.length > 1 ? p[i] : p[0]);
       const rpm = g(rpmP), load = g(loadP), comb = g(combP), crank = g(crankP),
         cut = g(cutP), over = g(overP), cyls = g(cylP), thr = g(thrP),
-        mast = g(mastP), boost = g(boostP), nos = g(nosP), cold = g(coldP);
+        mast = g(mastP), boost = g(boostP), nos = g(nosP), cold = g(coldP),
+        spin = g(spinP);
 
       this.t += 1 / sr;
 
@@ -86,9 +96,11 @@ class ICEAudioProcessor extends AudioWorkletProcessor {
           }
         }
       }
-      // overrun exhaust crackle
-      if (over > 0.5 && Math.random() < (rpm / 4000) * 0.00028) {
-        this.env = Math.min(1.3, this.env + 0.25 + Math.random() * 0.4);
+      // overrun exhaust crackle (bigger when hot & revving, throatier on big engines)
+      if (over > 0.5 && Math.random() < (rpm / 4000) * 0.00042) {
+        this.env = Math.min(1.3, this.env + 0.35 + Math.random() * (0.45 + 0.45 * thr));
+        // rare BIG backfire bang
+        if (rpm > 3200 && Math.random() < 0.06) { this.bangEnv = 1; this.bangPh = 0; }
       }
 
       const decay = 150 + rpm * 0.06;
@@ -111,6 +123,11 @@ class ICEAudioProcessor extends AudioWorkletProcessor {
         sig += Math.sin(this.subPh) * subGain;
         this.shufPh += 2 * Math.PI * (rpm / 60) * 1.5 / sr;
         sig += Math.sin(this.shufPh) * 0.05 * load;
+        // exhaust drone: saw-ish tone at firing frequency (richer growl)
+        this.dronePh += 2 * Math.PI * Math.max(10, fireHz) / sr;
+        const ph = (this.dronePh / (2 * Math.PI)) % 1;
+        const drone = (ph * 2 - 1) * 0.6 + Math.sin(this.dronePh) * 0.4;
+        sig += drone * 0.055 * (0.3 + 0.7 * load) * comb * (0.5 + 0.5 * thr);
       }
 
       // --- intake whoosh (throttle-open broadband) ---
@@ -136,6 +153,31 @@ class ICEAudioProcessor extends AudioWorkletProcessor {
         this.clunkPh += 2 * Math.PI * 85 / sr;
         sig += Math.sin(this.clunkPh) * this.clunkEnv * 0.5;
         this.clunkEnv *= Math.exp(-30 / sr);
+      }
+
+      // --- compressor surge "stu-stu-stu" (flutter on lift-off) ---
+      if (this.flutEnv > 0.004) {
+        this.flutPh += 2 * Math.PI * (640 + 320 * Math.sin(2 * Math.PI * 21 * this.t)) / sr;
+        const warble = 0.55 + 0.45 * Math.sin(2 * Math.PI * 19 * this.t);
+        sig += Math.sin(this.flutPh) * this.flutEnv * 0.5 * warble;
+        sig += noise * this.flutEnv * 0.06;
+        this.flutEnv *= Math.exp(-9 / sr);
+      }
+
+      // --- big backfire BANG (low thump + sharp crack) ---
+      if (this.bangEnv > 0.004) {
+        this.bangPh += 2 * Math.PI * 62 / sr;
+        sig += Math.sin(this.bangPh) * this.bangEnv * 0.65;
+        sig += noise * this.bangEnv * 0.4;
+        this.bangEnv *= Math.exp(-22 / sr);
+      }
+
+      // --- tire screech (wheelspin in drive mode) ---
+      if (spin > 0.01) {
+        this.scrPh += 2 * Math.PI * (1080 + 140 * Math.sin(2 * Math.PI * 1.7 * this.t)) / sr;
+        const wob = 0.7 + 0.3 * Math.sin(2 * Math.PI * 13.7 * this.t);
+        sig += Math.sin(this.scrPh) * spin * 0.12 * wob;
+        sig += noise * spin * 0.075 * wob;
       }
 
       // --- nitrous hiss ---

@@ -70,8 +70,9 @@ export class EngineAudio {
   }
 
   // one-shot sound events
-  bov()    { if (this.node) this.node.port.postMessage({ bov: true }); }
-  shift()  { if (this.node) this.node.port.postMessage({ shift: true }); }
+  bov()     { if (this.node) this.node.port.postMessage({ bov: true }); }
+  shift()   { if (this.node) this.node.port.postMessage({ shift: true }); }
+  flutter() { if (this.node) this.node.port.postMessage({ flutter: true }); }
 
   setMaster(v) {
     if (this.params) this.params.master.setTargetAtTime(v, this.ctx.currentTime, 0.05);
@@ -95,6 +96,7 @@ export class EngineAudio {
       this.params.boost.setTargetAtTime(s.boost || 0, t, 0.08);
       this.params.nos.setTargetAtTime(s.nos ? 1 : 0, t, 0.01);
       this.params.cold.setTargetAtTime(s.cold ? 1 : 0, t, 0.5);
+      this.params.spin.setTargetAtTime(s.spin || 0, t, 0.05);
     } else if (this.fb) {
       const f = ((s.rpm / 60) * s.cyls) / 2;
       this.fb.o1.frequency.setTargetAtTime(Math.max(20, f), t, tc);
