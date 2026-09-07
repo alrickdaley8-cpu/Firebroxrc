@@ -7,13 +7,10 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js --dev",
-    "build": "npm run build:frontend && npm run build:server",
-    "build:frontend": "echo 'Frontend is static - no build step required'",
-    "build:server": "echo 'Server ready to deploy'",
-    "lint": "eslint public/js --ext .js || true",
-    "preview": "npx live-server public --port=8080 --no-browser",
-    "deploy": "npm run build && gh-pages -d public -b main",
-    "deploy:server": "echo 'Deploy server to VPS with SSH'"
+    "build": "echo 'Frontend served from root - no build needed'",
+    "preview": "npx live-server . --port=8080 --no-browser",
+    "deploy": "echo 'Push to main - GitHub Actions deploys automatically'",
+    "deploy:server": "echo 'Deploy server to VPS - see DEPLOYMENT.md'"
   },
   "repository": {
     "type": "git",
@@ -37,9 +34,7 @@
     "ws": "^8.16.0"
   },
   "devDependencies": {
-    "live-server": "^1.2.2",
-    "eslint": "^8.56.0",
-    "gh-pages": "^6.1.1"
+    "live-server": "^1.2.2"
   },
   "engines": {
     "node": ">=16.0.0"
