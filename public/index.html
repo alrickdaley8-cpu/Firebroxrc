@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebrox FPS - Three.js Multiplayer Shooter</title>
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/hud.css">
+    <link rel="stylesheet" href="css/menus.css">
+    <link rel="stylesheet" href="css/customization.css">
+    <link rel="stylesheet" href="css/inventory.css">
+</head>
+<body>
+    <!-- Main Canvas will be created by Three.js -->
+    <div id="game-container"></div>
+
+    <!-- Main Menu -->
+    <div id="main-menu" class="menu-container">
+        <div class="menu-content">
+            <h1 class="game-title">FIREBROX FPS</h1>
+            <p class="game-subtitle">Multiplayer Three.js Shooter</p>
+            
+            <div class="menu-buttons">
+                <button id="btn-play" class="menu-btn primary">
+                    <span class="btn-icon">▶</span>
+                    <span class="btn-text">PLAY</span>
+                </button>
+                <button id="btn-customize" class="menu-btn">
+                    <span class="btn-icon">🔧</span>
+                    <span class="btn-text">CUSTOMIZE WEAPONS</span>
+                </button>
+                <button id="btn-loadout" class="menu-btn">
+                    <span class="btn-icon">🎒</span>
+                    <span class="btn-text">LOADOUT</span>
+                </button>
+                <button id="btn-settings" class="menu-btn">
+                    <span class="btn-icon">⚙️</span>
+                    <span class="btn-text">SETTINGS</span>
+                </button>
+                <button id="btn-controls" class="menu-btn">
+                    <span class="btn-icon">⌨️</span>
+                    <span class="btn-text">CONTROLS</span>
+                </button>
+                <button id="btn-quit" class="menu-btn danger">
+                    <span class="btn-icon">✕</span>
+                    <span class="btn-text">QUIT</span>
+                </button>
+            </div>
+
+            <div class="menu-footer">
+                <p class="version-info">v1.0.0 | Three.js + Node.js Multiplayer</p>
+            </div>
+        </div>
+
+        <!-- Menu Background Scene (Three.js will render here) -->
+        <div id="menu-background"></div>
+    </div>
+
+    <!-- Settings Menu -->
+    <div id="settings-menu" class="menu-container hidden">
+        <div class="menu-content settings-content">
+            <button id="settings-back" class="back-btn">← BACK</button>
+            <h2>SETTINGS</h2>
+            
+            <div class="settings-group">
+                <h3>VIDEO SETTINGS</h3>
+                <div class="setting-item">
+                    <label>Graphics Quality</label>
+                    <select id="graphics-quality">
+                        <option value="low">Low</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="high">High</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label>Shadow Resolution</label>
+                    <select id="shadow-resolution">
+                        <option value="none">None</option>
+                        <option value="low">Low</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="high">High</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="settings-group">
+                <h3>AUDIO SETTINGS</h3>
+                <div class="setting-item slider-item">
+                    <label>Master Volume: <span id="volume-value">80</span>%</label>
+                    <input type="range" id="master-volume" min="0" max="100" value="80">
+                </div>
+                <div class="setting-item slider-item">
+                    <label>SFX Volume: <span id="sfx-value">90</span>%</label>
+                    <input type="range" id="sfx-volume" min="0" max="100" value="90">
+                </div>
+                <div class="setting-item slider-item">
+                    <label>Music Volume: <span id="music-value">50</span>%</label>
+                    <input type="range" id="music-volume" min="0" max="100" value="50">
+                </div>
+            </div>
+
+            <div class="settings-group">
+                <h3>CONTROLS</h3>
+                <div class="setting-item slider-item">
+                    <label>Mouse Sensitivity: <span id="sensitivity-value">50</span>%</label>
+                    <input type="range" id="mouse-sensitivity" min="1" max="100" value="50">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Controls Menu -->
+    <div id="controls-menu" class="menu-container hidden">
+        <div class="menu-content controls-content">
+            <button id="controls-back" class="back-btn">← BACK</button>
+            <h2>CONTROLS</h2>
+            
+            <div class="controls-grid">
+                <div class="control-category">
+                    <h3>Movement</h3>
+                    <div class="control-item">
+                        <span class="key">W</span><span>Move Forward</span>
+                    </div>
+                    <div class="control-item">
+                        <span class="key">A</span><span>Move Left</span>
+                    </div>
+                    <div class="control-item">
+                        <span class="key">S</span><span>Move Backward</span>
+                    </div>
+                    <div class="control-item">
+                        <span class="key">D</span><span>Move Right</span>
+                    </div>
+                    <div class="control-item">
+                        <span class="key">Shift</span><span>Sprint</span>
+                    </div>
+                    <div class="control-item">
+                        <span class="key">Ctrl</span><span>Crouch</span>
+                    </div>
+                </div>
+                <div class="control-category">
+                    <h3>Actions</h3>
+                    <div class="control-item">
+                        <span class="key">Mouse</span><span>Look Around</span>
+                    </div>
+                    <div class="control-item">
+                        <span class="key">Left Click</span><span>Shoot</span>
+                    </div>
+                    <div class="control-item">
+                        <span class="key">R</span><span>Reload</span>
+                    </div>
+                    <div class="control-item">
+                        <span class="key">Space</span><span>Jump</span>
+                    </div>
+                    <div class="control-item">
+                        <span class="key">Scroll Wheel</span><span>Change Weapon</span>
+                    </div>
+                    <div class="control-item">
+                        <span class="key">1</span><span>Primary Weapon</span>
+                    </div>
+                    <div class="control-item">
+                        <span class="key">2</span><span>Secondary Weapon</span>
+                    </div>
+                    <div class="control-item">
+                        <span class="key">3</span><span>Melee Weapon</span>
+                    </div>
+                </div>
+                <div class="control-category">
+                    <h3>Items</h3>
+                    <div class="control-item">
+                        <span class="key">G</span><span>Throw Grenade</span>
+                    </div>
+                    <div class="control-item">
+                        <span class="key">H</span><span>Use Health Pack</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pause Menu -->
+    <div id="pause-menu" class="menu-container hidden">
+        <div class="menu-content pause-content">
+            <h2>PAUSED</h2>
+            <div class="menu-buttons vertical">
+                <button id="btn-resume" class="menu-btn primary">
+                    <span class="btn-text">RESUME</span>
+                </button>
+                <button id="btn-pause-settings" class="menu-btn">
+                    <span class="btn-text">SETTINGS</span>
+                </button>
+                <button id="btn-exit-to-menu" class="menu-btn danger">
+                    <span class="btn-text">EXIT TO MAIN MENU</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Weapon Customization Menu -->
+    <div id="customize-menu" class="menu-container hidden">
+        <div class="menu-content customize-content">
+            <button id="customize-back" class="back-btn">← BACK</button>
+            <h2>WEAPON CUSTOMIZATION</h2>
+            
+            <div class="customize-layout">
+                <div class="customize-sidebar">
+                    <h3>WEAPONS</h3>
+                    <div id="weapon-list" class="weapon-list">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+                
+                <div class="customize-preview">
+                    <div id="weapon-preview" class="weapon-preview">
+                        <!-- 3D preview will be rendered here -->
+                        <div class="preview-placeholder">
+                            <p>Weapon preview will appear here</p>
+                        </div>
+                    </div>
+                    <div class="weapon-stats">
+                        <h3>STATS</h3>
+                        <div id="stat-bars">
+                            <div class="stat-bar">
+                                <label>Damage</label>
+                                <div class="bar-container">
+                                    <div id="stat-damage" class="bar fill" style="width: 80%"></div>
+                                </div>
+                                <span id="stat-damage-value">80</span>
+                            </div>
+                            <div class="stat-bar">
+                                <label>Accuracy</label>
+                                <div class="bar-container">
+                                    <div id="stat-accuracy" class="bar fill" style="width: 75%"></div>
+                                </div>
+                                <span id="stat-accuracy-value">75</span>
+                            </div>
+                            <div class="stat-bar">
+                                <label>Recoil</label>
+                                <div class="bar-container">
+                                    <div id="stat-recoil" class="bar" style="width: 40%"></div>
+                                </div>
+                                <span id="stat-recoil-value">40</span>
+                            </div>
+                            <div class="stat-bar">
+                                <label>Rate of Fire</label>
+                                <div class="bar-container">
+                                    <div id="stat-rof" class="bar fill" style="width: 65%"></div>
+                                </div>
+                                <span id="stat-rof-value">65</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="customize-attachments">
+                    <h3>ATTACHMENTS</h3>
+                    <div class="attachment-categories">
+                        <div class="attachment-category">
+                            <h4>OPTICS</h4>
+                            <div class="attachment-list">
+                                <label class="attachment-option">
+                                    <input type="radio" name="optic" value="none" checked>
+                                    <span class="attachment-info">
+                                        <span class="attachment-name">No Scope</span>
+                                        <span class="attachment-effect">Base accuracy</span>
+                                    </span>
+                                </label>
+                                <label class="attachment-option">
+                                    <input type="radio" name="optic" value="holo">
+                                    <span class="attachment-info">
+                                        <span class="attachment-name">Holographic</span>
+                                        <span class="attachment-effect">+10 accuracy, +5 weight</span>
+                                    </span>
+                                </label>
+                                <label class="attachment-option">
+                                    <input type="radio" name="optic" value="red-dot">
+                                    <span class="attachment-info">
+                                        <span class="attachment-name">Red Dot</span>
+                                        <span class="attachment-effect">+15 accuracy, -2 weight</span>
+                                    </span>
+                                </label>
+                                <label class="attachment-option">
+                                    <input type="radio" name="optic" value="scope-3x">
+                                    <span class="attachment-info">
+                                        <span class="attachment-name">3x Scope</span>
+                                        <span class="attachment-effect">+25 accuracy, +10 weight</span>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="attachment-category">
+                            <h4>BARREL</h4>
+                            <div class="attachment-list">
+                                <label class="attachment-option">
+                                    <input type="radio" name="barrel" value="none" checked>
+                                    <span class="attachment-info">
+                                        <span class="attachment-name">Standard</span>
+                                        <span class="attachment-effect">Base recoil</span>
+                                    </span>
+                                </label>
+                                <label class="attachment-option">
+                                    <input type="radio" name="barrel" value="muzzle">
+                                    <span class="attachment-info">
+                                        <span class="attachment-name">Muzzle Brake</span>
+                                        <span class="attachment-effect">-20% recoil, -10% sound</span>
+                                    </span>
+                                </label>
+                                <label class="attachment-option">
+                                    <input type="radio" name="barrel" value="extended">
+                                    <span class="attachment-info">
+                                        <span class="attachment-name">Extended Barrel</span>
+                                        <span class="attachment-effect">+5 damage, +5% range</span>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="attachment-category">
+                            <h4>STOCK</h4>
+                            <div class="attachment-list">
+                                <label class="attachment-option">
+                                    <input type="radio" name="stock" value="none" checked>
+                                    <span class="attachment-info">
+                                        <span class="attachment-name">No Stock</span>
+                                        <span class="attachment-effect">Lighter, less stability</span>
+                                    </span>
+                                </label>
+                                <label class="attachment-option">
+                                    <input type="radio" name="stock" value="collapsible">
+                                    <span class="attachment-info">
+                                        <span class="attachment-name">Collapsible Stock</span>
+                                        <span class="attachment-effect">Balanced stats</span>
+                                    </span>
+                                </label>
+                                <label class="attachment-option">
+                                    <input type="radio" name="stock" value="solid">
+                                    <span class="attachment-info">
+                                        <span class="attachment-name">Solid Stock</span>
+                                        <span class="attachment-effect">+15 stability, +2 recoil</span>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="attachment-category">
+                            <h4>SKIN</h4>
+                            <div class="attachment-list">
+                                <label class="attachment-option">
+                                    <input type="radio" name="skin" value="default" checked>
+                                    <span class="attachment-info">
+                                        <span class="attachment-name">Default</span>
+                                        <span class="attachment-effect">Standard appearance</span>
+                                    </span>
+                                </label>
+                                <label class="attachment-option">
+                                    <input type="radio" name="skin" value="camo">
+                                    <span class="attachment-info">
+                                        <span class="attachment-name">Desert Camo</span>
+                                        <span class="attachment-effect">Tactical appearance</span>
+                                    </span>
+                                </label>
+                                <label class="attachment-option">
+                                    <input type="radio" name="skin" value="black">
+                                    <span class="attachment-info">
+                                        <span class="attachment-name">Stealth Black</span>
+                                        <span class="attachment-effect">Low visibility</span>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <button id="btn-apply-attachments" class="apply-btn">APPLY CHANGES</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loadout Screen -->
+    <div id="loadout-menu" class="menu-container hidden">
+        <div class="menu-content loadout-content">
+            <button id="loadout-back" class="back-btn">← BACK</button>
+            <h2>SELECT LOADOUT</h2>
+            
+            <div class="loadout-slots">
+                <div class="loadout-slot">
+                    <h3>PRIMARY WEAPON</h3>
+                    <div class="slot-content">
+                        <select id="primary-weapon-select">
+                            <option value="rifle">Assault Rifle</option>
+                            <option value="smg">Submachine Gun</option>
+                            <option value="shotgun">Shotgun</option>
+                        </select>
+                        <button id="btn-primary-customize" class="small-btn">CUSTOMIZE</button>
+                    </div>
+                </div>
+                <div class="loadout-slot">
+                    <h3>SECONDARY WEAPON</h3>
+                    <div class="slot-content">
+                        <select id="secondary-weapon-select">
+                            <option value="pistol">Pistol</option>
+                            <option value="no-secondary">None</option>
+                        </select>
+                        <button id="btn-secondary-customize" class="small-btn">CUSTOMIZE</button>
+                    </div>
+                </div>
+                <div class="loadout-slot">
+                    <h3>MELEE WEAPON</h3>
+                    <div class="slot-content">
+                        <select id="melee-weapon-select">
+                            <option value="knife">Combat Knife</option>
+                            <option value="no-melee">None</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="loadout-slot">
+                    <h3>EQUIPMENT</h3>
+                    <div class="slot-content">
+                        <label><input type="checkbox" id="equip-grenades" checked> Grenades (5)</label>
+                        <label><input type="checkbox" id="equip-healthpacks" checked> Health Packs (3)</label>
+                        <label><input type="checkbox" id="equip-ammo" checked> Extra Ammo</label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="loadout-actions">
+                <button id="btn-confirm-loadout" class="menu-btn primary large">
+                    <span class="btn-text">CONFIRM LOADOUT</span>
+                </button>
+                <button id="btn-default-loadout" class="menu-btn">
+                    <span class="btn-text">DEFAULT LOADOUT</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Inventory Screen -->
+    <div id="inventory-menu" class="menu-container hidden">
+        <div class="menu-content inventory-content">
+            <button id="inventory-back" class="back-btn">← BACK</button>
+            <h2>INVENTORY</h2>
+            
+            <div class="inventory-layout">
+                <div class="inventory-weapons">
+                    <h3>WEAPONS</h3>
+                    <div id="inventory-weapon-list" class="inventory-grid">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+                <div class="inventory-items">
+                    <h3>ITEMS</h3>
+                    <div id="inventory-item-list" class="inventory-grid">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+            
+            <div class="inventory-info">
+                <div class="info-box">
+                    <h4>Tip</h4>
+                    <p>Press <strong>1, 2, 3</strong> or scroll wheel to switch weapons in-game. Use <strong>G</strong> for grenades and <strong>H</strong> for health packs.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- In-Game HUD -->
+    <div id="hud" class="hud hidden">
+        <!-- Crosshair -->
+        <div id="crosshair" class="crosshair">
+            <div class="crosshair-dot"></div>
+            <div class="crosshair-line crosshair-line-t"></div>
+            <div class="crosshair-line crosshair-line-b"></div>
+            <div class="crosshair-line crosshair-line-l"></div>
+            <div class="crosshair-line crosshair-line-r"></div>
+        </div>
+
+        <!-- Health Bar -->
+        <div id="health-container" class="hud-panel left">
+            <div class="health-bar-outer">
+                <div id="health-bar" class="health-bar-inner"></div>
+            </div>
+            <span id="health-text" class="hud-text">100%</span>
+        </div>
+
+        <!-- Weapon Display -->
+        <div id="weapon-display" class="hud-panel right weapon-display">
+            <div class="weapon-info">
+                <span id="weapon-name" class="weapon-name">ASSAULT RIFLE</span>
+                <div class="weapon-details">
+                    <span id="ammo-display" class="ammo-count">20 / 100</span>
+                    <span id="weapon-attachments" class="weapon-attachments">OPTIC: HOLO</span>
+                </div>
+            </div>
+            
+            <div id="reload-progress" class="reload-bar hidden">
+                <div id="reload-fill" class="reload-fill"></div>
+            </div>
+        </div>
+
+        <!-- Secondary ammo (for pistol/shotgun) -->
+        <div id="secondary-ammo" class="hud-panel right secondary-ammo hidden">
+            <span class="ammo-count">16</span>
+        </div>
+
+        <!-- Sprint/Raise indicator -->
+        <div id="status-indicators" class="hud-panel center">
+            <div id="sprint-indicator" class="status-indicator hidden">
+                <span class="indicator-icon">💨</span>
+                <span class="indicator-text">SPRINTING</span>
+            </div>
+            <div id="crouch-indicator" class="status-indicator hidden">
+                <span class="indicator-icon">⬇️</span>
+                <span class="indicator-text">CROUCHING</span>
+            </div>
+        </div>
+
+        <!-- Kill Feed -->
+        <div id="kill-feed" class="hud-panel top-left kill-feed hidden">
+            <div class="kill-feed-item">
+                <span class="kill-icon">💀</span>
+                <span class="kill-text">Player killed Enemy</span>
+            </div>
+        </div>
+
+        <!-- Connected players count -->
+        <div id="player-count" class="hud-panel top-right">
+            <span class="player-count-text">Players: <span id="player-count-value">1</span></span>
+        </div>
+    </div>
+
+    <!-- Connected Players List -->
+    <div id="players-list" class="hud hidden">
+        <div class="players-panel">
+            <h4>CONNECTED PLAYERS</h4>
+            <div id="players-container">
+                <div class="player-entry">
+                    <span class="player-color" style="background: #ff4444"></span>
+                    <span class="player-name">Local Player</span>
+                    <span class="player-status">Online</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="loading-screen hidden">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <p>LOADING...</p>
+        </div>
+    </div>
+
+    <!-- Death Screen -->
+    <div id="death-screen" class="death-screen hidden">
+        <div class="death-content">
+            <h1 class="death-title">ELIMINATED</h1>
+            <p class="death-stats">Kills: <span id="death-kills">0</span> | Deaths: <span id="death-deaths">1</span></p>
+            <div class="death-buttons">
+                <button id="btn-spectate" class="menu-btn">SPECTATE</button>
+                <button id="btn-respawn" class="menu-btn primary">RESPAWN</button>
+                <button id="btn-return-menu" class="menu-btn danger">MAIN MENU</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Connection Status -->
+    <div id="connection-status" class="connection-status">
+        <span id="connection-indicator" class="connection-indicator connected">● Connected</span>
+        <span id="server-ip" class="server-ip">localhost:3000</span>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="notification-toast" class="notification hidden"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="js/constants.js"></script>
+    <script src="js/loaders.js"></script>
+    <script src="js/player.js"></script>
+    <script src="js/weapon.js"></script>
+    <script src="js/native-game.js"></script>
+    <script src="js/networking.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/customization.js"></script>
+    <script src="js/loadout.js"></script>
+    <script src="js/inventory.js"></script>
+    <script src="js/audio.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

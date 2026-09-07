@@ -1,0 +1,21 @@
+{
+  "name": "firebrox-fps",
+  "version": "1.0.0",
+  "description": "AAA-quality Three.js FPS game with multiplayer, weapon customization, and inventory system",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "live-server public --port=8080 --no-browser",
+    "build": "echo 'No build step needed for this vanilla JS project'"
+  },
+  "keywords": ["threejs", "fps", "multiplayer", "game"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "three": "^0.160.0",
+    "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "live-server": "^1.2.2"
+  }
+}
