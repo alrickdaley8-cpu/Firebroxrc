@@ -1,6 +1,6 @@
 # Firebrox FPS
 
-A AAA-quality three.js first-person shooter built for the browser with multiplayer support, weapon customization, and inventory system.
+A AAA-quality Three.js first-person shooter built for the browser with multiplayer support, weapon customization, and inventory system.
 
 ## Features
 
@@ -21,6 +21,7 @@ firebrox-fps/
 ├── package.json          # Dependencies and scripts
 ├── server.js             # Node.js WebSocket multiplayer server
 ├── README.md             # This file
+├── .gitignore            # Git ignore file
 ├── public/
 │   ├── index.html        # Main HTML file
 │   └── css/
@@ -29,6 +30,19 @@ firebrox-fps/
 │       ├── menus.css     # Menu system styles
 │       ├── customization.css  # Weapon customization styles
 │       └── inventory.css # Inventory display styles
+│   └── js/
+│       ├── main.js       # Game entry point (browser)
+│       ├── constants.js  # Game configuration
+│       ├── loaders.js    # Asset loader
+│       ├── player.js     # Player controller
+│       ├── weapon.js     # Weapon system
+│       ├── native-game.js  # Game controller
+│       ├── networking.js # Client-side networking
+│       ├── ui.js         # UI manager
+│       ├── customization.js  # Customization UI
+│       ├── loadout.js    # Loadout system
+│       ├── inventory.js  # Inventory system
+│       └── audio.js      # Audio manager
 ├── src/
 │   ├── main.js           # Game entry point
 │   ├── constants.js      # Game configuration
@@ -242,33 +256,33 @@ The client automatically connects to localhost:3000 when you click Play. To conn
 - Close other tabs and applications
 - Check for background processes using CPU
 
+## GitHub Integration
+
+This project is ready to be hosted on GitHub:
+
+1. The repository structure follows standard conventions
+2. Includes README with setup instructions
+3. Node.js server is deployable
+4. Anyone can clone and run the multiplayer server
+
+To contribute:
+```bash
+git clone https://github.com/yourusername/firebrox-fps.git
+cd firebrox-fps
+npm install
+npm start
+```
+
 ## License
 
 MIT License
 
-## Contributing
+## Credits
 
-Contributions are welcome! Please read the following guidelines:
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-### Code Style
-
-- ES6+ JavaScript with classes
-- Clear naming conventions
-- Comments for complex systems
-- Consistent indentation (4 spaces)
-
-## Acknowledgments
-
-- Three.js - 3D graphics library
+- Three.js - 3D rendering library
 - Node.js - Server runtime
-- WebSockets - Network protocol
+- WebSocket - Network protocol
 
 ---
 
-**Firebrox FPS** - Created for browser-based multiplayer FPS action!
+**Firebrox FPS** - Browser-based multiplayer FPS action!
