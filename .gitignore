@@ -2,7 +2,9 @@
 node_modules/
 
 # Build outputs
-package-lock.json
+dist/
+build/
+firebrox-build.tar.gz
 
 # IDE and editor files
 .idea/
